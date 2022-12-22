@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "bgzf.h"
+#include "htslib/bgzf.h"
 #include "scaffold.hpp"
 
 class Scaffolds {

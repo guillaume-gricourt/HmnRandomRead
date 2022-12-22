@@ -7,8 +7,8 @@
 #include <string>
 #include <vector>
 
-#include "bgzf.h"
-#include "hfile.h"
+#include "htslib/bgzf.h"
+#include "htslib/hfile.h"
 #include "index.hpp"
 #include "scaffold.hpp"
 #include "tools.hpp"

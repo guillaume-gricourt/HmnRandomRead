@@ -1,4 +1,4 @@
-#include "Faidx.hpp"
+#include "faidxh.hpp"
 
 #include <string>
 

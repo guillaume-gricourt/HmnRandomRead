@@ -7,9 +7,9 @@
 #include <string>
 #include <vector>
 
-#include "Faidx.hpp"
-#include "bgzf.h"
-#include "hfile.h"
+#include "faidxh.hpp"
+#include "htslib/bgzf.h"
+#include "htslib/hfile.h"
 #include "index.hpp"
 #include "tools.hpp"
 

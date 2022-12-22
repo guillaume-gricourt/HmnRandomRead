@@ -31,6 +31,25 @@ lib/htslib-*/test/test_bgzf
 lib/htslib-*/test/test_realn
 lib/htslib-*/test/test_view
 
+lib/htslib-*/config_vars.h
+lib/htslib-*/htscodecs.mk
+lib/htslib-*/htslib-uninstalled.pc
+lib/htslib-*/htslib.pc.tmp
+lib/htslib-*/htslib_static.mk
+lib/htslib-*/test/pileup
+lib/htslib-*/test/pileup_mod
+lib/htslib-*/test/plugins-dlhts
+lib/htslib-*/test/test-bcf_set_variant_type
+lib/htslib-*/test/test-parse-reg
+lib/htslib-*/test/test_expr
+lib/htslib-*/test/test_index
+lib/htslib-*/test/test_introspection
+lib/htslib-*/test/test_kfunc
+lib/htslib-*/test/test_kstring
+lib/htslib-*/test/test_mod
+lib/htslib-*/test/test_str2int
+lib/htslib-*/test/test_time_funcs
+lib/htslib-*/version.h
 # Misc
 *.pico
 *.dylib

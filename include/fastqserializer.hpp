@@ -4,8 +4,8 @@
 
 #include <string>
 
-#include "bgzf.h"
 #include "fastq.hpp"
+#include "htslib/bgzf.h"
 
 class FastqSerializer {
 private:

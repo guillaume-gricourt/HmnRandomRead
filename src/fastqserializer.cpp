@@ -4,8 +4,8 @@
 #include <iostream>
 #include <stdexcept>
 
-#include "bgzf.h"
 #include "fastq.hpp"
+#include "htslib/bgzf.h"
 
 using namespace std;
 

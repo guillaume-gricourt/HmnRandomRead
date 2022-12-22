@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "Faidx.hpp"
-#include "bgzf.h"
+#include "faidxh.hpp"
+#include "htslib/bgzf.h"
 
 class Faidxr {
 private:

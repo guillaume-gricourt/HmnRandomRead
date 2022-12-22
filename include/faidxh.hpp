@@ -1,6 +1,6 @@
 // Copyright 2022 guillaume-gricourt
-#ifndef INCLUDE_FAIDX_HPP_
-#define INCLUDE_FAIDX_HPP_
+#ifndef INCLUDE_FAIDXH_HPP_
+#define INCLUDE_FAIDXH_HPP_
 
 #include <string>
 

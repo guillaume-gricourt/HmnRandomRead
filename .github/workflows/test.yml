@@ -6,6 +6,9 @@ jobs:
 
   MakeTest:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
     steps:
       - name: 'Checkout'
         uses: actions/checkout@v3
@@ -13,10 +16,13 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2
         with:
           miniconda-version: 'latest'
+          environment-file: recipes/workflow.yaml
+          auto-activate-base: false
+          activate-environment: test
       - name: 'Tests'
         run: |
-          pip install pytest
-          make test
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA/envs/test/lib
+          make LIBS="-I include -I $CONDA/envs/test/include -L $CONDA/envs/test/lib" test
 
   Lint:
     runs-on: ubuntu-latest

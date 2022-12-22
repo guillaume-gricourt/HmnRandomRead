@@ -10,8 +10,8 @@
 #include <stdexcept>
 #include <string>
 
-#include "Faidx.hpp"
 #include "args.hpp"
+#include "faidxh.hpp"
 #include "faidxr.hpp"
 #include "randomgenerator.hpp"
 #include "reference.hpp"
