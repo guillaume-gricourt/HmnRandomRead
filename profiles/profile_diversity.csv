@@ -1,0 +1,7 @@
+##Version: 1.0
+#identifiant,Mutation Rate,Indel Fraction,Indel Extend,Maximum Insertion Size
+human,0.001,0.15,0.3,15
+bacteria,0.4,0.15,0.45,15
+virus,0.001,0.15,0.3,15
+fungi,0.001,0.15,0.3,15
+parasita,0.001,0.15,0.3,15
