@@ -1,0 +1,44 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Specific lib
+lib/htslib-*/bgzip
+lib/htslib-*/config.h
+lib/htslib-*/config.log
+lib/htslib-*/config.mk
+lib/htslib-*/config.status
+lib/htslib-*/htsfile
+lib/htslib-*/libhts.a
+lib/htslib-*/tabix
+lib/htslib-*/test/fieldarith
+lib/htslib-*/test/hfile
+lib/htslib-*/test/hts_endian
+lib/htslib-*/test/sam
+lib/htslib-*/test/test-bcf-sr
+lib/htslib-*/test/test-bcf-translate
+lib/htslib-*/test/test-regidx
+lib/htslib-*/test/test-vcf-api
+lib/htslib-*/test/test-vcf-sweep
+lib/htslib-*/test/test_bgzf
+lib/htslib-*/test/test_realn
+lib/htslib-*/test/test_view
+
+# Misc
+*.pico
+*.dylib
+lib/htslib-*/bin
+*.swp
+*.zip
+*.DS_Store
+obj
+HmnRandomRead
+__pycache__
+super-linter.log
