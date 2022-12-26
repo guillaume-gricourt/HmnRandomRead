@@ -1,7 +1,7 @@
 # HmnRandomRead
 
-[![Github Version](https://img.shields.io/github/v/release/guillaume-gricourt/HmnRandomRead?display_name=tag&sort=semver)](version)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black) [![GitHub Super-Linter](https://github.com/guillaume-gricourt/HmnRandomRead/workflows/Tests/badge.svg)](https://github.com/marketplace/actions/super-linter)
+[![Github Version](https://img.shields.io/github/v/release/guillaume-gricourt/HmnRandomRead?display_name=tag&sort=semver)](version)  [![Conda Version](https://img.shields.io/conda/vn/bioconda/hmnrandomread.svg)](https://anaconda.org/bioconda/hmnrandomread)   
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black) [![GitHub Super-Linter](https://github.com/guillaume-gricourt/HmnRandomRead/workflows/Tests/badge.svg)](https://github.com/marketplace/actions/super-linter)  
 [![License](https://img.shields.io/github/license/guillaume-gricourt/HmnRandomRead)](license)
 
 ## Features
