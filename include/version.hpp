@@ -1,7 +1,7 @@
 #ifndef SRC_VERSION_HPP_
 #define SRC_VERSION_HPP_
 
-#define HMNRANDOMREAD_VERSION "0.9.0"
+#define HMNRANDOMREAD_VERSION "0.9.1"
 #define HMNRANDOMREAD_DATE "Dec. 2022"
 
 #endif
