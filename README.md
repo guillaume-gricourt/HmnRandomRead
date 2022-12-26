@@ -16,9 +16,7 @@
 ## Install
 
 ```sh
-git clone git@github.com:guillaume-gricourt/HmnRandomRead.git
-cd HmnRandomRead
-make
+conda install -c bioconda hmnrandomread
 ```
 
 ## Use
