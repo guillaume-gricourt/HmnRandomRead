@@ -52,7 +52,7 @@ Indicate also the number of sequence to generate for each reference.
 
 ### Library size
 
-``mean-insert-size` and `std-insert-size`: the gaussian parameters to represent the fragment size.
+`mean-insert-size` and `std-insert-size`: the gaussian parameters to represent the fragment size.
 
 ### Profile diversity
 
