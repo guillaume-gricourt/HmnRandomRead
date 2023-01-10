@@ -7,20 +7,12 @@
 using namespace std;
 
 Faidx::Faidx()
-    : name(""),
-      len(0),
-      seq_offset(0),
-      line_blen(0),
-      line_len(0),
+    : name(""), len(0), seq_offset(0), line_blen(0), line_len(0),
       qual_offset(0) {}
 Faidx::Faidx(string aname, long long int alen, long long int aseqoffset,
              int alineblen, int alinelen, int aqualoffset)
-    : name(aname),
-      len(alen),
-      seq_offset(aseqoffset),
-      line_blen(alineblen),
-      line_len(alinelen),
-      qual_offset(aqualoffset) {}
+    : name(aname), len(alen), seq_offset(aseqoffset), line_blen(alineblen),
+      line_len(alinelen), qual_offset(aqualoffset) {}
 
 string Faidx::getName() const noexcept { return name; }
 int Faidx::getLineLen() const noexcept { return line_len; }

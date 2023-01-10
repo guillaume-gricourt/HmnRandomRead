@@ -9,19 +9,19 @@
 
 class FastqSerializer {
 private:
-    std::string finput;
-    BGZF* fp;
-    int compression_level;
+  std::string finput;
+  BGZF *fp;
+  int compression_level;
 
 public:
-    FastqSerializer(std::string);
-    ~FastqSerializer();
-    FastqSerializer& operator=(const FastqSerializer&);
+  FastqSerializer(std::string);
+  ~FastqSerializer();
+  FastqSerializer &operator=(const FastqSerializer &);
 
-    // Others
-    void open();
-    void close();
-    void writeRecord(const Fastq&);
+  // Others
+  void open();
+  void close();
+  void writeRecord(const Fastq &);
 };
 
-#endif  // INCLUDE_FASTQSERIALIZER_HPP_
+#endif // INCLUDE_FASTQSERIALIZER_HPP_

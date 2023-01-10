@@ -48,152 +48,150 @@ const char comp_tab[256] = {
 
 const string nucleotides = "ATCG";
 
-Sequence::Sequence(string& seq) : sequence(seq) {}
+Sequence::Sequence(string &seq) : sequence(seq) {}
 
 string Sequence::toString() const noexcept { return sequence; }
 size_t Sequence::getLength() const noexcept { return sequence.size(); }
 string Sequence::getSequence(int length, bool start, bool reverse_compl) {
-    string sub("");
-    int ix_start = 0;
-    if (start) {
-        sub = sequence.substr(0, length);
-    } else {
-        if (length < static_cast<int>(sequence.length())) {
-            ix_start = sequence.length() - length;
-        }
-        sub = sequence.substr(ix_start, string::npos);
+  string sub("");
+  int ix_start = 0;
+  if (start) {
+    sub = sequence.substr(0, length);
+  } else {
+    if (length < static_cast<int>(sequence.length())) {
+      ix_start = sequence.length() - length;
     }
-    if (reverse_compl) {
-        reverseComplement(&sub);
-    }
-    return sub;
+    sub = sequence.substr(ix_start, string::npos);
+  }
+  if (reverse_compl) {
+    reverseComplement(&sub);
+  }
+  return sub;
 }
 
-void Sequence::chooseBase(RandomGenerator* random_generator, char* nucl,
-                          char* remove) {
-    string combinaison = "";
-    if (remove) {
-        if (islower(*remove)) {
-            combinaison = Tools::toLower(&nucleotides);
-        } else {
-            combinaison = nucleotides;
-        }
-        size_t pos = combinaison.find_first_of(*remove);
-        // Check if alphabet degenerated
-        if (pos != string::npos) {
-            combinaison.erase(combinaison.begin() + pos);
-        }
+void Sequence::chooseBase(RandomGenerator *random_generator, char *nucl,
+                          char *remove) {
+  string combinaison = "";
+  if (remove) {
+    if (islower(*remove)) {
+      combinaison = Tools::toLower(&nucleotides);
     } else {
-        combinaison = nucleotides;
+      combinaison = nucleotides;
     }
+    size_t pos = combinaison.find_first_of(*remove);
+    // Check if alphabet degenerated
+    if (pos != string::npos) {
+      combinaison.erase(combinaison.begin() + pos);
+    }
+  } else {
+    combinaison = nucleotides;
+  }
 
-    *nucl = combinaison[random_generator->randomRange(
-        0, static_cast<int>(combinaison.size()) - 1)];
+  *nucl = combinaison[random_generator->randomRange(
+      0, static_cast<int>(combinaison.size()) - 1)];
 }
 
-void Sequence::makeMutation(RandomGenerator* random_generator,
+void Sequence::makeMutation(RandomGenerator *random_generator,
                             shared_ptr<Diversity> diversity) {
-    // Create data struct
-    auto len_seq = sequence.size();
-    auto ilen_seq = static_cast<int>(len_seq);
-    vector<MutationType> mutations(len_seq, MutationType::NONE);
-    vector<string> insertions;
-    bool deleting = false;
-    char nucl;
-    int len_ins(0);  //, total_len_ins(0), total_len_del(0);
-    stringstream buf;
+  // Create data struct
+  auto len_seq = sequence.size();
+  auto ilen_seq = static_cast<int>(len_seq);
+  vector<MutationType> mutations(len_seq, MutationType::NONE);
+  vector<string> insertions;
+  bool deleting = false;
+  char nucl;
+  int len_ins(0); //, total_len_ins(0), total_len_del(0);
+  stringstream buf;
 
-    // cout << "create vector" << endl;
-    for (int i(0); i < ilen_seq; ++i) {
-        if (deleting) {
-            if (random_generator->random48() < diversity->getIndelExtend()) {
-                mutations[i] = MutationType::DELETE;
-                // total_len_del++;
-                continue;
-            } else {
-                deleting = false;
-            }
-        }
-        if (random_generator->random48() <
-            diversity->getMutRate()) {  // mutation
-            if (random_generator->random48() >=
-                diversity->getIndelFrac()) {  // substitution
-                mutations[i] = MutationType::SUBSTITUTE;
-            } else {
-                if (random_generator->random48() < 0.5 && i > 1) {  // deletion
-                    mutations[i] = MutationType::DELETE;
-                    deleting = true;
-                    // total_len_del++;
-                } else {  // insertion
-                    len_ins = 1;
-                    auto p = random_generator->random48();
-                    while (len_ins <= diversity->getMaxInsSize() &&
-                           p < diversity->getIndelExtend()) {
-                        len_ins++;
-                    }
-                    // total_len_ins += len_ins;
-                    mutations[i] = MutationType::INSERT;
-
-                    for (int j(0); j < len_ins; ++j) {
-                        Sequence::chooseBase(random_generator, &nucl);
-                        buf << (char)nucl;
-                    }
-                    insertions.push_back(buf.str());
-                    buf.str(string());
-                }
-            }
-        }
+  // cout << "create vector" << endl;
+  for (int i(0); i < ilen_seq; ++i) {
+    if (deleting) {
+      if (random_generator->random48() < diversity->getIndelExtend()) {
+        mutations[i] = MutationType::DELETE;
+        // total_len_del++;
+        continue;
+      } else {
+        deleting = false;
+      }
     }
-    // cout << "apply mutations" << endl;
-    // Apply Mutations
-    int pos_seq(0);
-    //+ total_len_ins - total_len_del
-    for (int i(0); i < ilen_seq; ++i) {
-        if (mutations[i] == MutationType::INSERT) {
-            sequence.insert(pos_seq, insertions[0]);
-            pos_seq += insertions[0].length() - 1;
-            insertions.erase(insertions.begin());
-        }
+    if (random_generator->random48() < diversity->getMutRate()) { // mutation
+      if (random_generator->random48() >=
+          diversity->getIndelFrac()) { // substitution
+        mutations[i] = MutationType::SUBSTITUTE;
+      } else {
+        if (random_generator->random48() < 0.5 && i > 1) { // deletion
+          mutations[i] = MutationType::DELETE;
+          deleting = true;
+          // total_len_del++;
+        } else { // insertion
+          len_ins = 1;
+          auto p = random_generator->random48();
+          while (len_ins <= diversity->getMaxInsSize() &&
+                 p < diversity->getIndelExtend()) {
+            len_ins++;
+          }
+          // total_len_ins += len_ins;
+          mutations[i] = MutationType::INSERT;
 
-        if (mutations[i] == MutationType::SUBSTITUTE) {
-            Sequence::chooseBase(random_generator, &nucl, &sequence[pos_seq]);
-            sequence[pos_seq] = nucl;
+          for (int j(0); j < len_ins; ++j) {
+            Sequence::chooseBase(random_generator, &nucl);
+            buf << (char)nucl;
+          }
+          insertions.push_back(buf.str());
+          buf.str(string());
         }
-
-        if (mutations[i] == MutationType::DELETE) {
-            sequence.erase(sequence.begin() + pos_seq);
-            --pos_seq;
-        }
-
-        pos_seq++;
+      }
     }
+  }
+  // cout << "apply mutations" << endl;
+  // Apply Mutations
+  int pos_seq(0);
+  //+ total_len_ins - total_len_del
+  for (int i(0); i < ilen_seq; ++i) {
+    if (mutations[i] == MutationType::INSERT) {
+      sequence.insert(pos_seq, insertions[0]);
+      pos_seq += insertions[0].length() - 1;
+      insertions.erase(insertions.begin());
+    }
+
+    if (mutations[i] == MutationType::SUBSTITUTE) {
+      Sequence::chooseBase(random_generator, &nucl, &sequence[pos_seq]);
+      sequence[pos_seq] = nucl;
+    }
+
+    if (mutations[i] == MutationType::DELETE) {
+      sequence.erase(sequence.begin() + pos_seq);
+      --pos_seq;
+    }
+
+    pos_seq++;
+  }
 }
 
-void Sequence::reverseComplement(string* str) noexcept {
-    char c;
-    int i = 0, j = str->length() - 1;
+void Sequence::reverseComplement(string *str) noexcept {
+  char c;
+  int i = 0, j = str->length() - 1;
 
-    while (i <= j) {
-        c = (*str)[i];
-        (*str)[i] = comp_tab[(unsigned char)(*str)[j]];
-        (*str)[j] = comp_tab[(unsigned char)c];
-        i++;
-        j--;
-    }
+  while (i <= j) {
+    c = (*str)[i];
+    (*str)[i] = comp_tab[(unsigned char)(*str)[j]];
+    (*str)[j] = comp_tab[(unsigned char)c];
+    i++;
+    j--;
+  }
 }
-void Sequence::reverse(string* str) noexcept {
-    char c;
-    int i = 0, j = str->length() - 1;
+void Sequence::reverse(string *str) noexcept {
+  char c;
+  int i = 0, j = str->length() - 1;
 
-    while (i < j) {
-        c = (*str)[i];
-        (*str)[i] = (*str)[j];
-        (*str)[j] = c;
-        i++;
-        j--;
-    }
+  while (i < j) {
+    c = (*str)[i];
+    (*str)[i] = (*str)[j];
+    (*str)[j] = c;
+    i++;
+    j--;
+  }
 }
 
-char& Sequence::operator[](int i) { return sequence[i]; }
+char &Sequence::operator[](int i) { return sequence[i]; }
 char Sequence::operator[](int i) const { return sequence[i]; }
-

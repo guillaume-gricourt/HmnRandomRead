@@ -14,4 +14,3 @@ string Scaffold::getName() const noexcept { return name; }
 long long int Scaffold::getStart() const noexcept { return start; }
 long long int Scaffold::getStop() const noexcept { return stop; }
 long long int Scaffold::getLength() const noexcept { return stop - start; }
-
