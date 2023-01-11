@@ -62,6 +62,7 @@ Indicate also the number of sequence to generate for each reference.
 * Indel Fraction: rate of indel compare to single mutation
 * Indel Extend: probability to extend the indel at each base added
 * Maximum Insertion Size: maximal size of insertion
+The header is mandatory.
 
 ### Profile error
 
@@ -73,6 +74,7 @@ Indicate also the number of sequence to generate for each reference.
 * strand: `forward` or `reverse`
 * cycles total: by strand
 * error by cycle: rate of error by cycle, semi-colon separated. Equal to the number of `cycles total`.
+The header is mandatory.
 
 ## Test
 
