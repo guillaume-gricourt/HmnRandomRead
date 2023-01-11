@@ -75,7 +75,6 @@ int RandomRead::makeReads() {
     nbReads += ref->getNbReads();
   }
 
-  // cout << "total reads " << nbReads << endl;
   // Run
   int count(0);
   std::vector<Scaffold> scaffolds;
@@ -91,51 +90,23 @@ int RandomRead::makeReads() {
 
   for (int64_t i = 0; i < nbReads; ++i) {
     Scaffold scaffold;
-
-    // cout << "Start for loop" << endl;
     // Find Org - Get ref name unique
     nb_ref = static_cast<int>(args.getReferences()->size());
-
-    // cout << "Nb ref " << nb_ref << endl;
     ix_org = 0;
-
     if (nb_ref > 1) {
       ix_org = random_generator.randomRange(0, nb_ref - 1);
     }
-    // cout << "ix org " << ix_org << endl;
-
     auto &choiceRef = args.getReferences()->at(ix_org);
-
-    // cout << "Choice ref " << choiceRef->getFileName() << endl;
-
-    // cout << "min len scaff " << min_length_scaffold << endl;
-
     while (count < 10) {
       // Find Scaffold
-
-      // From :
+      // From:
       // https://softwareengineering.stackexchange.com/questions/150616/get-weighted-random-item
-      // cout << "choice scaff" << endl;
       scaffolds = choiceRef->getScaffolds().getVector();
 
       length = choiceRef->getScaffolds().getTotalLength();
       intervals = choiceRef->getScaffolds().getIntervals();
 
-      // cout << "Length " << length << endl;
-      // cout << "intervals " << intervals.size() << endl;
-      /*
-      for(auto& scaff : scaffolds){
-
-              scaffolds_keep.push_back(scaff);
-              length += scaff.getLength();
-              intervals.push_back(length);
-      }
-      */
-      // cout << "Length scaff " << length << endl;
-
       ix_scaff = random_generator.randomRangeLong(0L, length);
-
-      // cout << "Ix scaff " << ix_scaff << endl;
 
       for (size_t j = 0; j < intervals.size(); j++) {
         if (intervals.at(j) >= ix_scaff) {
@@ -152,8 +123,6 @@ int RandomRead::makeReads() {
       // Defined Insert length/Loc
       sizeInsert = std::round(random_generator.randomNormal(
           (double)args.getMeanInsertSize(), (double)args.getStdInsertSize()));
-      // cout << "Size insert " << sizeInsert << " " <<
-      // scaffold.getLength() << " " << scaffold.getName() << endl;
       // TODO(guillaume-gricourt): Loop on choice
       // Check if size in scaffolds
 
@@ -163,10 +132,6 @@ int RandomRead::makeReads() {
         locationStop = scaffold.getStop();
       } else {
         // normalize
-        // cout << "Scaff start " << scaffold.getStart() << " " <<
-        // scaffold.getStop() - static_cast<long long int>(sizeInsert)
-        // << endl;
-
         locationStart = random_generator.randomRangeLong(
             scaffold.getStart(),
             scaffold.getStop() - static_cast<int64_t>(sizeInsert));
@@ -177,9 +142,6 @@ int RandomRead::makeReads() {
       std::stringstream bufRoi;
       bufRoi << scaffold.getName() << ":" << locationStart << "-"
              << locationStop;
-
-      // cout << "Before seq " << bufRoi.str() <<  endl;
-
       seq = choiceRef->getFaidxr().fetch(bufRoi.str());
 
       if (seq == "") {
@@ -192,38 +154,25 @@ int RandomRead::makeReads() {
       length = 0;
     }
     // Add mutations : deletion/insertion/sub/N
-    // cout << "Before sequence" << endl;
     Sequence sequence(seq);
-    // cout << "Before make mutation" << endl;
-    // cout << "Sequence " << sequence.toString() << endl;
     if (args.getProfileDiversity() && choiceRef->getIdDiversity() != "") {
       sequence.makeMutation(&random_generator,
                             args.getProfileDiversity()->getDiversity(
                                 choiceRef->getIdDiversity()));
     }
     // Strand : F or R
-    // cout << "Before create string read" << endl;
     std::string read1_seq(""), read2_seq("");
 
     double strand = random_generator.randomRange(0.0, 1.0);
 
-    // cout << "Strand " << strand << endl;
-    // cout << "Sequence " << sequence.toString() << endl;
     if (strand >= 0.5) {
-      // cout << "Before r1" << endl;
       read1_seq = sequence.getSequence(args.getLengthReads(), true, false);
-      // cout << "Before r2" << endl;
       read2_seq = sequence.getSequence(args.getLengthReads(), false, true);
-      // cout << "after r2" << endl;
     } else {
       read1_seq = sequence.getSequence(args.getLengthReads(), false, true);
       read2_seq = sequence.getSequence(args.getLengthReads(), true, false);
     }
-    // cout << "R1 " << read1_seq << endl;
-    // cout << "R2 " << read2_seq << endl;
-
     // Create record
-    // cout << "Before create Fastq" << endl;
     Fastq read1(read1_seq, 33, i, (strand >= 0.5) ? true : false,
                 choiceRef->getFileName(), scaffold.getName(), locationStart,
                 locationStart + static_cast<int>(read1_seq.length()));
@@ -231,21 +180,15 @@ int RandomRead::makeReads() {
                 choiceRef->getFileName(), scaffold.getName(),
                 locationStop - static_cast<int>(read2_seq.length()),
                 locationStop);
-
     // Quality
-    // cout << "Before create quality" << endl;
     read1.initQual(&random_generator);
     read2.initQual(&random_generator);
-
     // Errors sequencing
-    // cout << "Before make error" << endl;
     if (args.isProfileError()) {
       read1.makeErrors(&random_generator, args.getProfileError());
       read2.makeErrors(&random_generator, args.getProfileError());
     }
-
     // Write output
-    // cout << "Before write output" << endl;
     if (read1.getStrand() == 0) {
       read_ser_1.writeRecord(read1);
       read_ser_2.writeRecord(read2);
@@ -254,11 +197,6 @@ int RandomRead::makeReads() {
       read_ser_1.writeRecord(read2);
     }
 
-    /********
-    ** MAJ **
-    ********/
-    // cout << "Before MAJ" << endl;
-    // cout << "choice ref " << choiceRef->getNbReadsRemaining()<< endl;
     choiceRef->minus();
     if (choiceRef->getNbReadsRemaining() == 0) {
       std::cout << "Remove " << choiceRef->getFilePath() << " " << ix_org
@@ -277,7 +215,6 @@ int RandomRead::makeReads() {
     seq = "";
     scaffold_find = false;
   }
-  // cout << "Before close" << endl;
   read_ser_1.close();
   read_ser_2.close();
   return 0;

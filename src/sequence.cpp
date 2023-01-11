@@ -14,9 +14,6 @@
 #include "randomgenerator.hpp"
 #include "tools.hpp"
 
-/*****************
- * Static member *
- * **************/
 const char comp_tab[256] = {
     'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N',
     'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N',
@@ -99,15 +96,13 @@ void Sequence::makeMutation(RandomGenerator *random_generator,
   std::vector<std::string> insertions;
   bool deleting = false;
   char nucl;
-  int len_ins(0); //, total_len_ins(0), total_len_del(0);
+  int len_ins(0);
   std::stringstream buf;
 
-  // cout << "create vector" << endl;
   for (int i(0); i < ilen_seq; ++i) {
     if (deleting) {
       if (random_generator->random48() < diversity->getIndelExtend()) {
         mutations[i] = MutationType::DELETE;
-        // total_len_del++;
         continue;
       } else {
         deleting = false;
@@ -121,7 +116,6 @@ void Sequence::makeMutation(RandomGenerator *random_generator,
         if (random_generator->random48() < 0.5 && i > 1) { // deletion
           mutations[i] = MutationType::DELETE;
           deleting = true;
-          // total_len_del++;
         } else { // insertion
           len_ins = 1;
           auto p = random_generator->random48();
@@ -129,7 +123,6 @@ void Sequence::makeMutation(RandomGenerator *random_generator,
                  p < diversity->getIndelExtend()) {
             len_ins++;
           }
-          // total_len_ins += len_ins;
           mutations[i] = MutationType::INSERT;
 
           for (int j(0); j < len_ins; ++j) {
@@ -142,10 +135,8 @@ void Sequence::makeMutation(RandomGenerator *random_generator,
       }
     }
   }
-  // cout << "apply mutations" << endl;
   // Apply Mutations
   int pos_seq(0);
-  //+ total_len_ins - total_len_del
   for (int i(0); i < ilen_seq; ++i) {
     if (mutations[i] == MutationType::INSERT) {
       sequence.insert(pos_seq, insertions[0]);
