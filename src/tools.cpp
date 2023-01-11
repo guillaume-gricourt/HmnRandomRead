@@ -1,3 +1,4 @@
+// Copyright 2022 guillaume-gricourt
 #include "tools.hpp"
 
 #include <fstream>
@@ -7,38 +8,37 @@
 #include <string>
 #include <vector>
 
-using namespace std;
-
-bool Tools::isFileExist(const string fpath) {
-    ifstream infile(fpath.c_str());
-    return infile.good();
+bool Tools::isFileExist(const std::string fpath) {
+  std::ifstream infile(fpath.c_str());
+  return infile.good();
 }
 
-vector<string> Tools::split(const string& s, const char* delim) {
-    stringstream ss(s);
-    string item;
-    vector<string> tokens;
-    while (getline(ss, item, *delim)) {
-        tokens.push_back(item);
-    }
-    return tokens;
+std::vector<std::string> Tools::split(const std::string &s, const char *delim) {
+  std::stringstream ss(s);
+  std::string item;
+  std::vector<std::string> tokens;
+  while (getline(ss, item, *delim)) {
+    tokens.push_back(item);
+  }
+  return tokens;
 }
 
-int Tools::stringToInt(const string args) { return stoi(args); }
-long int Tools::stringToLong(const string args) { return stol(args); }
-double Tools::stringToDouble(const string args) { return stod(args); }
-float Tools::stringToFloat(const string args) { return stof(args); }
-bool Tools::replace(string& str, const string& from, const string& to) {
-    size_t start_pos = str.find(from);
-    if (start_pos == std::string::npos) return false;
-    str.replace(start_pos, from.length(), to);
-    return true;
+int Tools::stringToInt(const std::string args) { return stoi(args); }
+int64_t Tools::stringToLong(const std::string args) { return stol(args); }
+double Tools::stringToDouble(const std::string args) { return stod(args); }
+float Tools::stringToFloat(const std::string args) { return stof(args); }
+bool Tools::replace(std::string *str, const std::string &from,
+                    const std::string &to) {
+  size_t start_pos = (*str).find(from);
+  if (start_pos == std::string::npos)
+    return false;
+  (*str).replace(start_pos, from.length(), to);
+  return true;
 }
-string Tools::toLower(const string* n) {
-    stringstream buf;
-    for (auto s : *n) {
-        buf << (char)tolower(s);
-    }
-    return buf.str();
+std::string Tools::toLower(const std::string *n) {
+  std::stringstream buf;
+  for (auto s : *n) {
+    buf << (char)tolower(s);
+  }
+  return buf.str();
 }
-
