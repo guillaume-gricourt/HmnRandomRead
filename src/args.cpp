@@ -170,6 +170,4 @@ void Args::showStart(const std::string version) const {
   std::cout << "Start - ";
   showVersion(version);
 }
-void Args::showEnd() const {
-  std::cout << "End - " << soft_name << std::endl;
-}
+void Args::showEnd() const { std::cout << "End - " << soft_name << std::endl; }
