@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.1](https://github.com/guillaume-gricourt/HmnRandomRead/tree/0.9.1) (2022-12-24)
+
+[Full Changelog](https://github.com/guillaume-gricourt/HmnRandomRead/compare/0.9.0...0.9.1)
+
 ## [0.9.0](https://github.com/guillaume-gricourt/HmnRandomRead/tree/0.9.0) (2022-12-24)
 
 [Full Changelog](https://github.com/guillaume-gricourt/HmnRandomRead/compare/a4dc3ca410f900afae8de153a64ca81bdfc3b84a...0.9.0)
