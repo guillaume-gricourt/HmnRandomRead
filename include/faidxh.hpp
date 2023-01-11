@@ -6,24 +6,24 @@
 
 class Faidx {
 private:
-    std::string name;
-    long long int len;
-    long long int seq_offset;
-    int line_blen;
-    int line_len;
-    int qual_offset;
+  std::string name;
+  int64_t len;
+  int64_t seq_offset;
+  int line_blen;
+  int line_len;
+  int qual_offset;
 
 public:
-    Faidx();
-    Faidx(std::string, long long int, long long int, int, int, int);
+  Faidx();
+  Faidx(std::string, int64_t, int64_t, int, int, int);
 
-    // inherit
-    std::string getName() const noexcept;
-    int getLineLen() const noexcept;
-    int getLineBlen() const noexcept;
-    long long int getLen() const noexcept;
-    long long int getSeqOffset() const noexcept;
-    int getQualOffset() const noexcept;
+  // inherit
+  std::string getName() const noexcept;
+  int getLineLen() const noexcept;
+  int getLineBlen() const noexcept;
+  int64_t getLen() const noexcept;
+  int64_t getSeqOffset() const noexcept;
+  int getQualOffset() const noexcept;
 };
 
-#endif  // INLUDE_FAIDXH_HPP_
+#endif // INCLUDE_FAIDXH_HPP_

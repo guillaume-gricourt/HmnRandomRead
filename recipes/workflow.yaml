@@ -4,7 +4,9 @@ channels:
   - bioconda
   - defaults
 dependencies:
+  - gxx
   - gxx_impl_linux-64
+  - gxx_linux-64
+  - htslib
   - make
   - pytest
-  - htslib

@@ -31,7 +31,7 @@ jobs:
           TAG: ${{ steps.tag_raw.outputs.new_tag }}
         run: |
           TAG=$(echo "$TAG" | cut -f1 -d "-")
-          echo "::set-output name=tag::$TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
   Changelog:
     runs-on: ubuntu-latest
@@ -81,10 +81,10 @@ jobs:
           VERSION_PATH=$(find . -name version.hpp | head -n 1)
           VERSION_DIR=$(dirname "$VERSION_PATH")
           cur=$(date "+%b. %Y")
-          sed -i "4s/\".*\"/\"$TAG\"/" "$VERSION_PATH"
-          sed -i "5s/\".*\"/\"$cur\"/" "$VERSION_PATH"
-          echo "::set-output name=version_path::${VERSION_PATH}"
-          echo "::set-output name=version_dir::${VERSION_DIR}"
+          sed -i "5s/\".*\"/\"$TAG\"/" "$VERSION_PATH"
+          sed -i "6s/\".*\"/\"$cur\"/" "$VERSION_PATH"
+          echo "version_path=$VERSION_PATH" >> "$GITHUB_OUTPUT"
+          echo "version_dir=$VERSION_DIR" >> "$GITHUB_OUTPUT"
       - name: 'Upload Artifact Version'
         uses: actions/upload-artifact@v2
         with:

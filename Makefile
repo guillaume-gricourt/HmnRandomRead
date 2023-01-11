@@ -3,12 +3,13 @@ TARGET = HmnRandomRead
 DIRINC = ./include
 DIRSRC = ./src
 DIROBJ = ./obj
+DIRLIB=./lib
 
 SRC = $(wildcard $(DIRSRC)/*.cpp)
 OBJ = $(patsubst %.cpp,$(DIROBJ)/%.o,$(notdir $(SRC)))
 
 CXX = g++
-LIBS = -I $(DIRINC)
+LIBS = -I $(DIRINC) -I lib/htslib-1.16
 CXXFLAGS = -std=c++14 -Wall -Wextra -O3 -g3 -lhts
 
 # Rules

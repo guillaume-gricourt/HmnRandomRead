@@ -8,18 +8,18 @@
 
 class RandomRead {
 private:
-    Args &args;
-    RandomGenerator random_generator;
-    FastqSerializer read_ser_1;
-    FastqSerializer read_ser_2;
+  Args &args;
+  RandomGenerator random_generator;
+  FastqSerializer read_ser_1;
+  FastqSerializer read_ser_2;
 
 public:
-    RandomRead(Args &);
+  explicit RandomRead(Args &);
 
-    // Others
-    int init();
-    int makeIndex();
-    int makeReads();
+  // Others
+  int init();
+  int makeIndex();
+  int makeReads();
 };
 
-#endif  // INCLUDE_RANDOMREAD_HPP_
+#endif // INCLUDE_RANDOMREAD_HPP_
