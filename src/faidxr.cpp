@@ -24,7 +24,7 @@ std::vector<Faidx> Faidxr::getVector() { return faidxs; }
 int Faidxr::insertIndex(const std::string name, int64_t len, int64_t seq_offset,
                         int line_blen, int line_len, int qual_offset = 0) {
   if (name.length() < 1) {
-    std::cout << "Malformed line" << std::endl;
+    std::cerr << "Malformed line" << std::endl;
     return -1;
   }
 
@@ -65,6 +65,7 @@ int Faidxr::init() {
 
 int Faidxr::buildCore() {
   std::stringstream bufname;
+  std::stringstream bufferror;
   int c(0), read_done(0), line_num(1);
   // Faidx_t *idx;
   int64_t seq_offset(0), seq_len(0);
@@ -85,10 +86,10 @@ int Faidxr::buildCore() {
         switch (c) {
         case '>':
           if (format == FAI_FASTQ) {
-            std::cout << "Found '>' in a FASTQ file, error at "
+            bufferror << "Found '>' in a FASTQ file, error at "
                          "line "
                       << line_num << std::endl;
-            throw std::logic_error("");
+            throw std::logic_error(bufferror.str());
           }
 
           format = FAI_FASTA;
@@ -97,10 +98,10 @@ int Faidxr::buildCore() {
 
         case '@':
           if (format == FAI_FASTA) {
-            std::cout << "Found '@' in a FASTA file, error at "
+            bufferror << "Found '@' in a FASTA file, error at "
                          "line "
                       << line_num << std::endl;
-            throw std::logic_error("");
+            throw std::logic_error(bufferror.str());
           }
 
           format = FAI_FASTQ;
@@ -112,10 +113,10 @@ int Faidxr::buildCore() {
           if ((c = bgzf_getc(bgzf)) == '\n') {
             line_num++;
           } else {
-            std::cout << "Format error, carriage return not "
+            bufferror << "Format error, carriage return not "
                          "followed by new line at line "
                       << line_num << std::endl;
-            throw std::logic_error("");
+            throw std::logic_error(bufferror.str());
           }
           break;
 
@@ -125,9 +126,9 @@ int Faidxr::buildCore() {
           break;
 
         default: {
-          std::cout << "Format error, unexpected \"" << c << "\"\0 at line "
+          bufferror << "Format error, unexpected \"" << c << "\"\0 at line "
                     << line_num << std::endl;
-          throw std::logic_error("");
+          throw std::logic_error(bufferror.str());
           break;
         }
         }
@@ -153,9 +154,9 @@ int Faidxr::buildCore() {
         // kputsn("", 0, &name);
 
         if (c < 0) {
-          std::cout << "The last entry has no sequence " << bufname.str()
+          bufferror << "The last entry has no sequence " << bufname.str()
                     << std::endl;
-          throw std::logic_error("");
+          throw std::logic_error(bufferror.str());
         }
 
         // read the rest of the line if necessary
@@ -188,10 +189,10 @@ int Faidxr::buildCore() {
             line_num++;
             continue;
           } else if (c == '\n') {
-            std::cout << "Inlined empty line is not allowed in "
+            bufferror << "Inlined empty line is not allowed in "
                          "sequence "
                       << bufname.str() << " at line " << line_num << std::endl;
-            throw std::logic_error("");
+            throw std::logic_error(bufferror.str());
           }
         }
 
@@ -216,9 +217,9 @@ int Faidxr::buildCore() {
             state = SEQ_END;
           }
         } else if (line_len < ll) { // line too long int
-          std::cout << "Different line length in sequence " << bufname.str()
+          bufferror << "Different line length in sequence " << bufname.str()
                     << std::endl;
-          throw std::logic_error("");
+          throw std::logic_error(bufferror.str());
         }
         line_num++;
         break;
@@ -233,19 +234,19 @@ int Faidxr::buildCore() {
           line_num++;
           continue;
         } else {
-          std::cout << "Format error, expecting '+', got " << c << " at line "
+          bufferror << "Format error, expecting '+', got " << c << " at line "
                     << line_num << std::endl;
-          throw std::logic_error("");
+          throw std::logic_error(bufferror.str());
         }
         break;
 
       case IN_QUAL:
         if (c == '\n') {
           if (!read_done) {
-            std::cout << "Inlined empty line is not allowed in "
+            bufferror << "Inlined empty line is not allowed in "
                          "quality of sequence "
                       << bufname.str() << std::endl;
-            throw std::logic_error("");
+            throw std::logic_error(bufferror.str());
           }
 
           state = OUT_READ;
@@ -267,19 +268,19 @@ int Faidxr::buildCore() {
         qual_len += cl;
 
         if (line_len < ll) {
-          std::cout << "Quality line length too long int in " << bufname.str()
+          bufferror << "Quality line length too long int in " << bufname.str()
                     << " at line " << line_num << std::endl;
-          throw std::logic_error("");
+          throw std::logic_error(bufferror.str());
         } else if (qual_len == seq_len) {
           read_done = 1;
         } else if (qual_len > seq_len) {
-          std::cout << "Quality length long inter than sequence in "
+          bufferror << "Quality length long inter than sequence in "
                     << bufname.str() << " at line " << line_num << std::endl;
-          throw std::logic_error("");
+          throw std::logic_error(bufferror.str());
         } else if (line_len > ll) {
-          std::cout << "Quality line length too short in " << bufname.str()
+          bufferror << "Quality line length too short in " << bufname.str()
                     << " at line " << line_num << std::endl;
-          throw std::logic_error("");
+          throw std::logic_error(bufferror.str());
         }
 
         line_num++;
@@ -293,11 +294,11 @@ int Faidxr::buildCore() {
   if (read_done) {
     if (insertIndex(bufname.str(), seq_len, seq_offset, char_len, line_len,
                     qual_offset) != 0) {
-      throw std::logic_error("");
+      throw std::logic_error("Undefined error");
     }
     bufname.str(std::string());
   } else {
-    throw std::logic_error("");
+    throw std::logic_error("Undefined error");
   }
   return 0;
 }
@@ -356,7 +357,7 @@ std::string Faidxr::retrieve(Faidx *fai, int64_t offset, int64_t beg,
                            beg % fai->getLineBlen(),
                        SEEK_SET);
   if (ret < 0) {
-    std::cout << "Failed to retrieve block. (Seeking in a compressed, .gzi "
+    std::cerr << "Failed to retrieve block. (Seeking in a compressed, .gzi "
                  "unindexed, file?)"
               << std::endl;
     return "";
@@ -370,7 +371,7 @@ std::string Faidxr::retrieve(Faidx *fai, int64_t offset, int64_t beg,
   }
 
   if (c < 0) {
-    std::cout << "Failed to retrieve block" << std::endl;
+    std::cerr << "Failed to retrieve block" << std::endl;
     return "";
   }
 

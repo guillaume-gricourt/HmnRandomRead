@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
         if (i + 1 < argc) {
           args.addReference(argv[++i]);
         } else {
-          args.showUsage("Reference must be indicated");
+          args.showUsage("Reference must be filled");
         }
       } else if (arg == "-lengthReads" || arg == "--length-reads") {
         if (i + 1 < argc) {
@@ -41,25 +41,25 @@ int main(int argc, char *argv[]) {
         if (i + 1 < argc) {
           args.setMeanInsertSize(argv[++i]);
         } else {
-          args.showUsage("Mean Insert Size insn't validated");
+          args.showUsage("Mean Insert Size is not validated");
         }
       } else if (arg == "-stdInsert" || arg == "--std-insert-size") {
         if (i + 1 < argc) {
           args.setStdInsertSize(argv[++i]);
         } else {
-          args.showUsage("Standard Deviation Insert Size insn't validated");
+          args.showUsage("Standard Deviation Insert Size is not valid");
         }
       } else if (arg == "-r1" || arg == "--read-forward") {
         if (i + 1 < argc) {
           args.setRead1(argv[++i]);
         } else {
-          args.showUsage("Format Read forward isn't valid");
+          args.showUsage("Format Read forward is not valid");
         }
       } else if (arg == "-r2" || arg == "--read-reverse") {
         if (i + 1 < argc) {
           args.setRead2(argv[++i]);
         } else {
-          args.showUsage("Format Read reverse isn't valid");
+          args.showUsage("Format Read reverse is not valid");
         }
       } else if (arg == "-profileDiversity" || arg == "--profile-diversity") {
         if (i + 1 < argc) {
@@ -77,23 +77,23 @@ int main(int argc, char *argv[]) {
         if (i + 1 < argc) {
           args.setProfileErrorId(argv[++i]);
         } else {
-          args.showUsage("Error profile id must be indicated");
+          args.showUsage("Error profile ID must be indicated");
         }
       } else if (arg == "-s" || arg == "--seed") {
         if (i + 1 < argc) {
           args.setSeed(argv[++i]);
         } else {
-          args.showUsage("Seed number isn't valid");
+          args.showUsage("Seed number is not valid");
         }
       } else {
-        args.showUsage("Unrecognized arg : " + arg);
+        args.showUsage("Unrecognized argument: " + arg);
       }
     }
   }
 
   // Check if ok
   if (!args.isValid()) {
-    args.showUsage("Arguments invalides");
+    args.showUsage("Arguments are not valid");
   } else {
     if (!args.getUsageVisible()) {
       RandomRead randomRead(args);

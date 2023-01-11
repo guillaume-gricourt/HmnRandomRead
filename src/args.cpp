@@ -76,7 +76,6 @@ int Args::addReference(std::string reference) {
     return 1;
   }
 
-  std::cout << "Nb reads " << nb_reads << std::endl;
   std::unique_ptr<Reference> ref =
       std::make_unique<Reference>(file_path, nb_reads, id_diversity);
   references.push_back(move(ref));
@@ -116,9 +115,9 @@ bool Args::isProfileDiversity() const noexcept {
 void Args::showUsage(const std::string error = "") {
   std::stringstream msg;
   if (error != "") {
-    msg << "Erreur:   " << error << std::endl << std::endl;
+    msg << "Error:   " << error << std::endl << std::endl;
   }
-  msg << "Usage:   " << soft_name << " [options] " << std::endl << std::endl;
+  msg << "Use:   " << soft_name << " [options] " << std::endl << std::endl;
   msg << "Options:" << std::endl;
   msg << "    Name    Type    Default    Description" << std::endl;
   msg << "    -h/--help    None    None    Show this help and exit "
@@ -156,8 +155,11 @@ void Args::showUsage(const std::string error = "") {
 
   msg << "        -s/--seed    [int]    " << seed
       << "    Seed number (optional)" << std::endl;
-
-  std::cout << msg.str();
+  if (error != "") {
+    std::cerr << msg.str();
+  } else {
+    std::cout << msg.str();
+  }
   usage_visible = true;
 }
 

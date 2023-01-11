@@ -28,25 +28,28 @@ RandomRead::RandomRead(Args &arg)
 
 int RandomRead::init() {
   // Make index
+  std::cout << "Make index for references" << std::endl;
   makeIndex();
-  std::cout << "Make index" << std::endl;
   // Profile Diversity
+  std::cout << "Parse - profil diversity" << std::endl;
   if (args.isProfileDiversity()) {
     args.getProfileDiversity()->parseCsv();
     for (auto &ref : *args.getReferences()) {
       if (args.getProfileDiversity()->count(ref->getIdDiversity()) > 1) {
         throw std::logic_error("Id profile diversity " + ref->getIdDiversity() +
                                " for reference " + ref->getFilePath() +
-                               " doesn't exist");
+                               " does not match");
       }
     }
   }
   // Profile Error
+  std::cout << "Parse - profil error" << std::endl;
   if (args.isProfileError()) {
     args.getProfileError()->parseCsv(args.getProfileErrorId(),
                                      args.isOutputPaired());
   }
   // Make reads
+  std::cout << "Make reads" << std::endl;
   makeReads();
   return 0;
 }
@@ -199,8 +202,6 @@ int RandomRead::makeReads() {
 
     choiceRef->minus();
     if (choiceRef->getNbReadsRemaining() == 0) {
-      std::cout << "Remove " << choiceRef->getFilePath() << " " << ix_org
-                << std::endl;
       args.removeReferences(ix_org);
     }
 

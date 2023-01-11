@@ -53,6 +53,7 @@ int Scaffolds::init(int min_len_to_keep) {
 
 int Scaffolds::buildCore() {
   std::stringstream bufname;
+  std::stringstream bufferror;
   int c(0), read_done(0), line_num(1), loop_name(0);
   // Faidx_t *idx;
   int seq_len(0), qual_len(0);
@@ -73,10 +74,10 @@ int Scaffolds::buildCore() {
         switch (c) {
         case '>':
           if (format == FAI_FASTQ) {
-            std::cout << "Found '>' in a FASTQ file, error at "
+            bufferror << "Found '>' in a FASTQ file, error at "
                          "line "
                       << line_num << std::endl;
-            throw std::logic_error("");
+            throw std::logic_error(bufferror.str());
           }
           format = FAI_FASTA;
           state = IN_NAME;
@@ -84,10 +85,10 @@ int Scaffolds::buildCore() {
 
         case '@':
           if (format == FAI_FASTA) {
-            std::cout << "Found '@' in a FASTA file, error at "
+            bufferror << "Found '@' in a FASTA file, error at "
                          "line "
                       << line_num << std::endl;
-            throw std::logic_error("");
+            throw std::logic_error(bufferror.str());
           }
           format = FAI_FASTQ;
           state = IN_NAME;
@@ -98,10 +99,10 @@ int Scaffolds::buildCore() {
           if ((c = bgzf_getc(bgzf)) == '\n') {
             line_num++;
           } else {
-            std::cout << "Format error, carriage return not "
+            bufferror << "Format error, carriage return not "
                          "followed by new line at line "
                       << line_num << std::endl;
-            throw std::logic_error("");
+            throw std::logic_error(bufferror.str());
           }
           break;
 
@@ -111,9 +112,9 @@ int Scaffolds::buildCore() {
           break;
 
         default: {
-          std::cout << "Format error, unexpected \"" << c << "\"\0 at line "
+          bufferror << "Format error, unexpected \"" << c << "\"\0 at line "
                     << line_num << std::endl;
-          throw std::logic_error("");
+          throw std::logic_error(bufferror.str());
           break;
         }
         }
@@ -137,9 +138,9 @@ int Scaffolds::buildCore() {
         } while ((c = bgzf_getc(bgzf)) >= 0);
 
         if (c < 0) {
-          std::cout << "The last entry has no sequence " << bufname.str()
+          bufferror << "The last entry has no sequence " << bufname.str()
                     << std::endl;
-          throw std::logic_error("");
+          throw std::logic_error(bufferror.str());
         }
         // read the rest of the line if necessary
         if (c != '\n')
@@ -170,10 +171,10 @@ int Scaffolds::buildCore() {
             line_num++;
             continue;
           } else if (c == '\n') {
-            std::cout << "Inlined empty line is not allowed in "
+            bufferror << "Inlined empty line is not allowed in "
                          "sequence "
                       << bufname.str() << " at line " << line_num << std::endl;
-            throw std::logic_error("");
+            throw std::logic_error(bufferror.str());
           }
         }
 
@@ -221,9 +222,9 @@ int Scaffolds::buildCore() {
             state = SEQ_END;
           }
         } else if (line_len < ll) { // line too long int
-          std::cout << "Different line length in sequence " << bufname.str()
+          bufferror << "Different line length in sequence " << bufname.str()
                     << std::endl;
-          throw std::logic_error("");
+          throw std::logic_error(bufferror.str());
         }
         line_num++;
         break;
@@ -237,19 +238,19 @@ int Scaffolds::buildCore() {
           line_num++;
           continue;
         } else {
-          std::cout << "Format error, expecting '+', got " << c << " at line "
+          bufferror << "Format error, expecting '+', got " << c << " at line "
                     << line_num << std::endl;
-          throw std::logic_error("");
+          throw std::logic_error(bufferror.str());
         }
         break;
 
       case IN_QUAL:
         if (c == '\n') {
           if (!read_done) {
-            std::cout << "Inlined empty line is not allowed in "
+            bufferror << "Inlined empty line is not allowed in "
                          "quality of sequence "
                       << bufname.str() << std::endl;
-            throw std::logic_error("");
+            throw std::logic_error(bufferror.str());
           }
           state = OUT_READ;
           line_num++;
@@ -269,19 +270,19 @@ int Scaffolds::buildCore() {
         ll++;
         qual_len += cl;
         if (line_len < ll) {
-          std::cout << "Quality line length too long int in " << bufname.str()
+          bufferror << "Quality line length too long int in " << bufname.str()
                     << " at line " << line_num << std::endl;
-          throw std::logic_error("");
+          throw std::logic_error(bufferror.str());
         } else if (qual_len == seq_len) {
           read_done = 1;
         } else if (qual_len > seq_len) {
-          std::cout << "Quality length long inter than sequence in "
+          bufferror << "Quality length long inter than sequence in "
                     << bufname.str() << " at line " << line_num << std::endl;
-          throw std::logic_error("");
+          throw std::logic_error(bufferror.str());
         } else if (line_len > ll) {
-          std::cout << "Quality line length too short in " << bufname.str()
+          bufferror << "Quality line length too short in " << bufname.str()
                     << " at line " << line_num << std::endl;
-          throw std::logic_error("");
+          throw std::logic_error(bufferror.str());
         }
         line_num++;
         break;
@@ -296,7 +297,7 @@ int Scaffolds::buildCore() {
       throw std::logic_error("Read done, error throw");
     }
   } else {
-    throw std::logic_error("");
+    throw std::logic_error("Undefined error");
   }
 
   return 0;
@@ -314,7 +315,7 @@ std::string Scaffolds::toString() {
 int Scaffolds::save() {
   std::ofstream flux(output.c_str());
   if (!flux) {
-    throw std::logic_error("Output isn't writable");
+    throw std::logic_error("Output is not writable");
   }
   flux << toString();
   return 0;
