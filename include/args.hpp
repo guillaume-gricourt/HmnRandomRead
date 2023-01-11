@@ -69,5 +69,7 @@ public:
   // Others
   void showUsage(const std::string);
   void showVersion(const std::string) const;
+  void showStart(const std::string) const;
+  void showEnd() const;
 };
 #endif // INCLUDE_ARGS_HPP_

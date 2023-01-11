@@ -96,8 +96,11 @@ int main(int argc, char *argv[]) {
     args.showUsage("Arguments are not valid");
   } else {
     if (!args.getUsageVisible()) {
+      args.showStart(HMNRANDOMREAD_VERSION);
       RandomRead randomRead(args);
-      return randomRead.init();
+      int res = randomRead.init();
+      args.showEnd();
+      return res;
     }
   }
   return 0;

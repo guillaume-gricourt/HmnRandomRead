@@ -166,3 +166,10 @@ void Args::showUsage(const std::string error = "") {
 void Args::showVersion(const std::string version) const {
   std::cout << soft_name << " v" << version << std::endl;
 }
+void Args::showStart(const std::string version) const {
+  std::cout << "Start - ";
+  showVersion(version);
+}
+void Args::showEnd() const {
+  std::cout << "End - " << soft_name << std::endl;
+}
