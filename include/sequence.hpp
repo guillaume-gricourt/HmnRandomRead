@@ -21,7 +21,7 @@ private:
   enum class MutationType { NONE, SUBSTITUTE, DELETE, INSERT };
 
 public:
-  Sequence(std::string &);
+  explicit Sequence(std::string &);
 
   std::string toString() const noexcept;
   std::string getSequence(int, bool, bool);

@@ -1,3 +1,4 @@
+// Copyright 2022 guillaume-gricourt
 #include "randomgenerator.hpp"
 
 #include <cfloat> // DBL_MAX
@@ -5,10 +6,8 @@
 #include <iostream>
 #include <random>
 
-using namespace std;
-
 // Helpers
-RandomGenerator::RandomGenerator(long long int s)
+RandomGenerator::RandomGenerator(int64_t s)
     : generator_normal(s), generator_uniform(s), generator_uniform_long(s) {}
 
 double RandomGenerator::randomNormal(double mean, double std) {
@@ -31,8 +30,8 @@ int RandomGenerator::randomRange(const int from, const int thru) {
   return std::uniform_int_distribution<int>{from, thru}(generator_uniform);
 }
 
-long long int RandomGenerator::randomRangeLong(const long long int from,
-                                               const long long int thru) {
-  return std::uniform_int_distribution<long long int>{from, thru}(
-      generator_uniform_long);
+int64_t RandomGenerator::randomRangeLong(const int64_t from,
+                                         const int64_t thru) {
+  return std::uniform_int_distribution<int64_t>{from,
+                                                thru}(generator_uniform_long);
 }

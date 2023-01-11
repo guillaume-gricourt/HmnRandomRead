@@ -1,3 +1,4 @@
+// Copyright 2022 guillaume-gricourt
 #include "sequence.hpp"
 
 #include <ctype.h>
@@ -12,8 +13,6 @@
 #include "diversity.hpp"
 #include "randomgenerator.hpp"
 #include "tools.hpp"
-
-using namespace std;
 
 /*****************
  * Static member *
@@ -46,14 +45,14 @@ const char comp_tab[256] = {
     */
 };
 
-const string nucleotides = "ATCG";
+const std::string nucleotides = "ATCG";
 
-Sequence::Sequence(string &seq) : sequence(seq) {}
+Sequence::Sequence(std::string &seq) : sequence(seq) {}
 
-string Sequence::toString() const noexcept { return sequence; }
+std::string Sequence::toString() const noexcept { return sequence; }
 size_t Sequence::getLength() const noexcept { return sequence.size(); }
-string Sequence::getSequence(int length, bool start, bool reverse_compl) {
-  string sub("");
+std::string Sequence::getSequence(int length, bool start, bool reverse_compl) {
+  std::string sub("");
   int ix_start = 0;
   if (start) {
     sub = sequence.substr(0, length);
@@ -61,7 +60,7 @@ string Sequence::getSequence(int length, bool start, bool reverse_compl) {
     if (length < static_cast<int>(sequence.length())) {
       ix_start = sequence.length() - length;
     }
-    sub = sequence.substr(ix_start, string::npos);
+    sub = sequence.substr(ix_start, std::string::npos);
   }
   if (reverse_compl) {
     reverseComplement(&sub);
@@ -71,7 +70,7 @@ string Sequence::getSequence(int length, bool start, bool reverse_compl) {
 
 void Sequence::chooseBase(RandomGenerator *random_generator, char *nucl,
                           char *remove) {
-  string combinaison = "";
+  std::string combinaison = "";
   if (remove) {
     if (islower(*remove)) {
       combinaison = Tools::toLower(&nucleotides);
@@ -80,7 +79,7 @@ void Sequence::chooseBase(RandomGenerator *random_generator, char *nucl,
     }
     size_t pos = combinaison.find_first_of(*remove);
     // Check if alphabet degenerated
-    if (pos != string::npos) {
+    if (pos != std::string::npos) {
       combinaison.erase(combinaison.begin() + pos);
     }
   } else {
@@ -92,16 +91,16 @@ void Sequence::chooseBase(RandomGenerator *random_generator, char *nucl,
 }
 
 void Sequence::makeMutation(RandomGenerator *random_generator,
-                            shared_ptr<Diversity> diversity) {
+                            std::shared_ptr<Diversity> diversity) {
   // Create data struct
   auto len_seq = sequence.size();
   auto ilen_seq = static_cast<int>(len_seq);
-  vector<MutationType> mutations(len_seq, MutationType::NONE);
-  vector<string> insertions;
+  std::vector<MutationType> mutations(len_seq, MutationType::NONE);
+  std::vector<std::string> insertions;
   bool deleting = false;
   char nucl;
   int len_ins(0); //, total_len_ins(0), total_len_del(0);
-  stringstream buf;
+  std::stringstream buf;
 
   // cout << "create vector" << endl;
   for (int i(0); i < ilen_seq; ++i) {
@@ -138,7 +137,7 @@ void Sequence::makeMutation(RandomGenerator *random_generator,
             buf << (char)nucl;
           }
           insertions.push_back(buf.str());
-          buf.str(string());
+          buf.str(std::string());
         }
       }
     }
@@ -168,7 +167,7 @@ void Sequence::makeMutation(RandomGenerator *random_generator,
   }
 }
 
-void Sequence::reverseComplement(string *str) noexcept {
+void Sequence::reverseComplement(std::string *str) noexcept {
   char c;
   int i = 0, j = str->length() - 1;
 
@@ -180,7 +179,7 @@ void Sequence::reverseComplement(string *str) noexcept {
     j--;
   }
 }
-void Sequence::reverse(string *str) noexcept {
+void Sequence::reverse(std::string *str) noexcept {
   char c;
   int i = 0, j = str->length() - 1;
 

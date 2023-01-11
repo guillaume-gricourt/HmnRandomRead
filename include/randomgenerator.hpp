@@ -13,7 +13,7 @@ private:
   std::mt19937 generator_uniform_long;
 
 public:
-  RandomGenerator(long long int);
+  explicit RandomGenerator(int64_t);
   // Getters
   double randomNormal(double, double);
   double random48();
@@ -35,7 +35,7 @@ public:
   }
   */
   double randomRange(const double, const double);
-  long long int randomRangeLong(const long long int, const long long int);
+  int64_t randomRangeLong(const int64_t, const int64_t);
   int randomRange(const int, const int);
 };
 #endif // INCLUDE_RANDOMGENERATOR_HPP_

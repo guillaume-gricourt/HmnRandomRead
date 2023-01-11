@@ -13,7 +13,7 @@ private:
   std::map<int, std::vector<float>> errors;
 
 public:
-  ProfileError(std::string);
+  explicit ProfileError(std::string);
   ProfileError &operator=(const ProfileError &) = default;
   ~ProfileError() = default;
 

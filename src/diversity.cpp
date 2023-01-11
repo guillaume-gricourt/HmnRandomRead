@@ -1,3 +1,4 @@
+// Copyright 2022 guillaume-gricourt
 #include "diversity.hpp"
 
 double Diversity::getMutRate() const noexcept { return mut_rate; }

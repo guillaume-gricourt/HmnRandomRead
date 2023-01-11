@@ -14,12 +14,12 @@ private:
   std::string output;
   std::vector<Scaffold> scaffolds;
   BGZF *bgzf = nullptr;
-  std::vector<long long int> intervals;
-  long long int length_scaffolds = 0;
+  std::vector<int64_t> intervals;
+  int64_t length_scaffolds = 0;
 
 public:
   Scaffolds(std::string, std::string);
-  Scaffolds(std::string);
+  explicit Scaffolds(std::string);
   Scaffolds();
   ~Scaffolds();
   Scaffolds &operator=(const Scaffolds &) = default;
@@ -31,10 +31,9 @@ public:
 
   int init(int);
   std::vector<Scaffold> getVector();
-  int insertIndex(const std::string name, long long int start,
-                  long long int end);
+  int insertIndex(const std::string, int64_t, int64_t);
   void initMembers();
-  long long int getTotalLength() const noexcept;
-  std::vector<long long int> getIntervals() const noexcept;
+  int64_t getTotalLength() const noexcept;
+  std::vector<int64_t> getIntervals() const noexcept;
 };
 #endif // INCLUDE_SCAFFOLDS_HPP_

@@ -48,7 +48,7 @@ Indicate also the number of sequence to generate for each reference.
 
 ### Sequencing size
 
-`length-reads`: the size of the library as sequenced by the sequencer 
+`length-reads`: the size of the library as sequenced by the sequencer
 
 ### Library size
 
@@ -56,8 +56,8 @@ Indicate also the number of sequence to generate for each reference.
 
 ### Profile diversity
 
-`profile-diversity` a CSV file, comma separated, with header: 
-* identifier: id of the fasta file
+`profile-diversity` a CSV file, comma separated, with header:
+* identifier: ID of the fasta file
 * Mutation Rate: probability to change the sequence
 * Indel Fraction: rate of indel compare to single mutation
 * Indel Extend: probability to extend the indel at each base added
@@ -66,7 +66,7 @@ Indicate also the number of sequence to generate for each reference.
 ### Profile error
 
 `profile-error` a CSV file, comma separated, with header:
-* identifier: an id choose by `profile-error-id`
+* identifier: an ID choose by `profile-error-id`
 * sequencer: name of the sequencer
 * flowcell: kind of flowcell
 * version: the kit version.

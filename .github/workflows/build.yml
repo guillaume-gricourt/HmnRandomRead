@@ -81,8 +81,8 @@ jobs:
           VERSION_PATH=$(find . -name version.hpp | head -n 1)
           VERSION_DIR=$(dirname "$VERSION_PATH")
           cur=$(date "+%b. %Y")
-          sed -i "4s/\".*\"/\"$TAG\"/" "$VERSION_PATH"
-          sed -i "5s/\".*\"/\"$cur\"/" "$VERSION_PATH"
+          sed -i "5s/\".*\"/\"$TAG\"/" "$VERSION_PATH"
+          sed -i "6s/\".*\"/\"$cur\"/" "$VERSION_PATH"
           echo "::set-output name=version_path::${VERSION_PATH}"
           echo "::set-output name=version_dir::${VERSION_DIR}"
       - name: 'Upload Artifact Version'

@@ -1,16 +1,15 @@
+// Copyright 2022 guillaume-gricourt
 #include "scaffold.hpp"
 
 #include <string>
 
-using namespace std;
-
 Scaffold::Scaffold() : name(""), start(0), stop(0) {}
-Scaffold::Scaffold(string aname, long long int astart, long long int astop)
+Scaffold::Scaffold(std::string aname, int64_t astart, int64_t astop)
     : name(aname), start(astart), stop(astop) {}
 
 // Getters
 
-string Scaffold::getName() const noexcept { return name; }
-long long int Scaffold::getStart() const noexcept { return start; }
-long long int Scaffold::getStop() const noexcept { return stop; }
-long long int Scaffold::getLength() const noexcept { return stop - start; }
+std::string Scaffold::getName() const noexcept { return name; }
+int64_t Scaffold::getStart() const noexcept { return start; }
+int64_t Scaffold::getStop() const noexcept { return stop; }
+int64_t Scaffold::getLength() const noexcept { return stop - start; }

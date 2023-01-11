@@ -14,7 +14,7 @@ private:
   FastqSerializer read_ser_2;
 
 public:
-  RandomRead(Args &);
+  explicit RandomRead(Args &);
 
   // Others
   int init();

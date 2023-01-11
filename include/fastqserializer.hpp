@@ -14,7 +14,7 @@ private:
   int compression_level;
 
 public:
-  FastqSerializer(std::string);
+  explicit FastqSerializer(std::string);
   ~FastqSerializer();
   FastqSerializer &operator=(const FastqSerializer &);
 

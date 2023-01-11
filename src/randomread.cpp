@@ -1,3 +1,4 @@
+// Copyright 2022 guillaume-gricourt
 #include "randomread.hpp"
 
 #include <algorithm>
@@ -19,8 +20,6 @@
 #include "scaffolds.hpp"
 #include "sequence.hpp"
 
-using namespace std;
-
 // Helpers
 RandomRead::RandomRead(Args &arg)
     : args(arg), random_generator(arg.getSeed()),
@@ -30,15 +29,15 @@ RandomRead::RandomRead(Args &arg)
 int RandomRead::init() {
   // Make index
   makeIndex();
-  cout << "Make index" << endl;
+  std::cout << "Make index" << std::endl;
   // Profile Diversity
   if (args.isProfileDiversity()) {
     args.getProfileDiversity()->parseCsv();
     for (auto &ref : *args.getReferences()) {
       if (args.getProfileDiversity()->count(ref->getIdDiversity()) > 1) {
-        throw logic_error("Id profile diversity " + ref->getIdDiversity() +
-                          " for reference " + ref->getFilePath() +
-                          " doesn't exist");
+        throw std::logic_error("Id profile diversity " + ref->getIdDiversity() +
+                               " for reference " + ref->getFilePath() +
+                               " doesn't exist");
       }
     }
   }
@@ -68,7 +67,7 @@ int RandomRead::makeReads() {
   read_ser_1.open();
   read_ser_2.open();
 
-  long long int nbReads(0);
+  int64_t nbReads(0);
   int nb_ref(0);
   int ix_org(0);
   // Calculate total nb reads
@@ -79,18 +78,18 @@ int RandomRead::makeReads() {
   // cout << "total reads " << nbReads << endl;
   // Run
   int count(0);
-  vector<Scaffold> scaffolds;
+  std::vector<Scaffold> scaffolds;
   // vector<Scaffold> scaffolds_keep;
-  vector<long long int> intervals;
-  long long int length(0);
-  long long int ix_scaff(0);
+  std::vector<int64_t> intervals;
+  int64_t length(0);
+  int64_t ix_scaff(0);
 
-  long long int locationStart(0), locationStop(0);
-  long long int sizeInsert(0);
-  string seq = "";
+  int64_t locationStart(0), locationStop(0);
+  int64_t sizeInsert(0);
+  std::string seq = "";
   bool scaffold_find = false;
 
-  for (long int i = 0; i < nbReads; ++i) {
+  for (int64_t i = 0; i < nbReads; ++i) {
     Scaffold scaffold;
 
     // cout << "Start for loop" << endl;
@@ -151,11 +150,11 @@ int RandomRead::makeReads() {
       }
 
       // Defined Insert length/Loc
-      sizeInsert = round(random_generator.randomNormal(
+      sizeInsert = std::round(random_generator.randomNormal(
           (double)args.getMeanInsertSize(), (double)args.getStdInsertSize()));
       // cout << "Size insert " << sizeInsert << " " <<
       // scaffold.getLength() << " " << scaffold.getName() << endl;
-      // TODO Loop on choice
+      // TODO(guillaume-gricourt): Loop on choice
       // Check if size in scaffolds
 
       // Defined loc
@@ -170,12 +169,12 @@ int RandomRead::makeReads() {
 
         locationStart = random_generator.randomRangeLong(
             scaffold.getStart(),
-            scaffold.getStop() - static_cast<long long int>(sizeInsert));
+            scaffold.getStop() - static_cast<int64_t>(sizeInsert));
         locationStop = locationStart + sizeInsert;
       }
 
       // Retrieve Insert-Sequence
-      stringstream bufRoi;
+      std::stringstream bufRoi;
       bufRoi << scaffold.getName() << ":" << locationStart << "-"
              << locationStop;
 
@@ -204,7 +203,7 @@ int RandomRead::makeReads() {
     }
     // Strand : F or R
     // cout << "Before create string read" << endl;
-    string read1_seq(""), read2_seq("");
+    std::string read1_seq(""), read2_seq("");
 
     double strand = random_generator.randomRange(0.0, 1.0);
 
@@ -262,7 +261,8 @@ int RandomRead::makeReads() {
     // cout << "choice ref " << choiceRef->getNbReadsRemaining()<< endl;
     choiceRef->minus();
     if (choiceRef->getNbReadsRemaining() == 0) {
-      cout << "Remove " << choiceRef->getFilePath() << " " << ix_org << endl;
+      std::cout << "Remove " << choiceRef->getFilePath() << " " << ix_org
+                << std::endl;
       args.removeReferences(ix_org);
     }
 

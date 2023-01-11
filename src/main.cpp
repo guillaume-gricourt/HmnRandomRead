@@ -1,3 +1,4 @@
+// Copyright 2022 guillaume-gricourt
 #include <getopt.h>
 
 #include <string>
@@ -6,13 +7,11 @@
 #include "randomread.hpp"
 #include "version.hpp"
 
-using namespace std;
-
 int main(int argc, char *argv[]) {
   Args args(argv[0]);
 
   // Command line
-  string arg;
+  std::string arg;
 
   if (argc < 2) {
     args.showUsage("");

@@ -1,3 +1,4 @@
+// Copyright 2022 guillaume-gricourt
 #include "fastqserializer.hpp"
 
 #include <cstring>
@@ -7,9 +8,7 @@
 #include "fastq.hpp"
 #include "htslib/bgzf.h"
 
-using namespace std;
-
-FastqSerializer::FastqSerializer(string fid)
+FastqSerializer::FastqSerializer(std::string fid)
     : finput(fid), fp(nullptr), compression_level(1) {}
 FastqSerializer::~FastqSerializer() {}
 FastqSerializer &FastqSerializer::operator=(const FastqSerializer &other) {
@@ -39,9 +38,9 @@ void FastqSerializer::open() {
 }
 void FastqSerializer::close() { bgzf_close(fp); }
 void FastqSerializer::writeRecord(const Fastq &record) {
-  string str = record.toString();
+  std::string str = record.toString();
   const char *ctr = str.c_str();
   if (bgzf_write(fp, ctr, str.length()) < 0) {
-    throw logic_error("Unable to write record to fastq file");
+    throw std::logic_error("Unable to write record to fastq file");
   }
 }

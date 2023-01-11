@@ -1,3 +1,4 @@
+// Copyright 2022 guillaume-gricourt
 #include "scaffolds.hpp"
 
 #include <fstream>
@@ -13,21 +14,18 @@
 #include "scaffold.hpp"
 #include "tools.hpp"
 
-using namespace std;
-
-Scaffolds::Scaffolds(string finput, string foutput)
+Scaffolds::Scaffolds(std::string finput, std::string foutput)
     : input(finput), output(foutput) {}
-Scaffolds::Scaffolds(string finput)
+Scaffolds::Scaffolds(std::string finput)
     : input(finput), output(finput + ".scaff") {}
 Scaffolds::Scaffolds() {}
 Scaffolds::~Scaffolds() { bgzf_close(bgzf); }
 
 std::vector<Scaffold> Scaffolds::getVector() { return scaffolds; }
 
-int Scaffolds::insertIndex(const string name, long long int start,
-                           long long int end) {
+int Scaffolds::insertIndex(const std::string name, int64_t start, int64_t end) {
   if (name.length() < 1) {
-    cout << "Malformed line" << endl;
+    std::cout << "Malformed line" << std::endl;
     return -1;
   }
 
@@ -43,7 +41,7 @@ int Scaffolds::init(int min_len_to_keep) {
   bgzf = bgzf_open(input.c_str(), "r");
   if (!Tools::isFileExist(output)) {
     if (buildCore() != 0) {
-      throw logic_error("Error when read file");
+      throw std::logic_error("Error when read file");
     }
     res = save();
   } else {
@@ -54,12 +52,12 @@ int Scaffolds::init(int min_len_to_keep) {
 }
 
 int Scaffolds::buildCore() {
-  stringstream bufname;
+  std::stringstream bufname;
   int c(0), read_done(0), line_num(1), loop_name(0);
   // Faidx_t *idx;
   int seq_len(0), qual_len(0);
   int char_len(0), cl(0), line_len(0), ll(0);
-  long long int start(1), stop(1); // samtools fetch 1-based
+  int64_t start(1), stop(1); // samtools fetch 1-based
   bool inN = true;
 
   enum read_state { OUT_READ, IN_NAME, IN_SEQ, SEQ_END, IN_QUAL } state;
@@ -75,24 +73,22 @@ int Scaffolds::buildCore() {
         switch (c) {
         case '>':
           if (format == FAI_FASTQ) {
-            cout << "Found '>' in a FASTQ file, error at "
-                    "line "
-                 << line_num << endl;
-            throw logic_error("");
+            std::cout << "Found '>' in a FASTQ file, error at "
+                         "line "
+                      << line_num << std::endl;
+            throw std::logic_error("");
           }
-
           format = FAI_FASTA;
           state = IN_NAME;
           break;
 
         case '@':
           if (format == FAI_FASTA) {
-            cout << "Found '@' in a FASTA file, error at "
-                    "line "
-                 << line_num << endl;
-            throw logic_error("");
+            std::cout << "Found '@' in a FASTA file, error at "
+                         "line "
+                      << line_num << std::endl;
+            throw std::logic_error("");
           }
-
           format = FAI_FASTQ;
           state = IN_NAME;
           break;
@@ -102,10 +98,10 @@ int Scaffolds::buildCore() {
           if ((c = bgzf_getc(bgzf)) == '\n') {
             line_num++;
           } else {
-            cout << "Format error, carriage return not "
-                    "followed by new line at line "
-                 << line_num << endl;
-            throw logic_error("");
+            std::cout << "Format error, carriage return not "
+                         "followed by new line at line "
+                      << line_num << std::endl;
+            throw std::logic_error("");
           }
           break;
 
@@ -115,9 +111,9 @@ int Scaffolds::buildCore() {
           break;
 
         default: {
-          cout << "Format error, unexpected \"" << c << "\"\0 at line "
-               << line_num << endl;
-          throw logic_error("");
+          std::cout << "Format error, unexpected \"" << c << "\"\0 at line "
+                    << line_num << std::endl;
+          throw std::logic_error("");
           break;
         }
         }
@@ -126,8 +122,8 @@ int Scaffolds::buildCore() {
       case IN_NAME:
         if (read_done) {
           if (!inN && insertIndex(bufname.str(), start, stop - 1) != 0)
-            throw logic_error("Create region index failded");
-          bufname.str(string());
+            throw std::logic_error("Create region index failded");
+          bufname.str(std::string());
           read_done = 0;
         }
         loop_name = 0;
@@ -141,15 +137,14 @@ int Scaffolds::buildCore() {
         } while ((c = bgzf_getc(bgzf)) >= 0);
 
         if (c < 0) {
-          cout << "The last entry has no sequence " << bufname.str() << endl;
-          throw logic_error("");
+          std::cout << "The last entry has no sequence " << bufname.str()
+                    << std::endl;
+          throw std::logic_error("");
         }
-
         // read the rest of the line if necessary
         if (c != '\n')
-          while ((c = bgzf_getc(bgzf)) >= 0 && c != '\n')
-            ;
-
+          while ((c = bgzf_getc(bgzf)) >= 0 && c != '\n') {
+          }
         state = IN_SEQ;
         seq_len = qual_len = char_len = line_len = 0;
         start = stop = 1;
@@ -170,23 +165,21 @@ int Scaffolds::buildCore() {
           if (c == '+') {
             state = IN_QUAL;
             if (c != '\n')
-              while ((c = bgzf_getc(bgzf)) >= 0 && c != '\n')
-                ;
+              while ((c = bgzf_getc(bgzf)) >= 0 && c != '\n') {
+              }
             line_num++;
             continue;
           } else if (c == '\n') {
-            cout << "Inlined empty line is not allowed in "
-                    "sequence "
-                 << bufname.str() << " at line " << line_num << endl;
-            throw logic_error("");
+            std::cout << "Inlined empty line is not allowed in "
+                         "sequence "
+                      << bufname.str() << " at line " << line_num << std::endl;
+            throw std::logic_error("");
           }
         }
 
         ll = cl = 0;
-
         if (format == FAI_FASTA)
           read_done = 1;
-
         do {
           ll++;
           cl++;
@@ -194,7 +187,7 @@ int Scaffolds::buildCore() {
             if (c == 'N' || c == 'n') {
               if (!inN) {
                 if (insertIndex(bufname.str(), start, stop - 1) != 0) {
-                  throw logic_error("Create region index failded");
+                  throw std::logic_error("Create region index failded");
                 }
                 start = stop;
                 stop++;
@@ -218,22 +211,20 @@ int Scaffolds::buildCore() {
 
         ll++;
         seq_len += cl;
-
         if (line_len == 0) { // first loop
           line_len = ll;
           char_len = cl;
         } else if (line_len > ll) { // end sequence
-
           if (format == FAI_FASTA) {
             state = OUT_READ;
           } else {
             state = SEQ_END;
           }
         } else if (line_len < ll) { // line too long int
-          cout << "Different line length in sequence " << bufname.str() << endl;
-          throw logic_error("");
+          std::cout << "Different line length in sequence " << bufname.str()
+                    << std::endl;
+          throw std::logic_error("");
         }
-
         line_num++;
         break;
 
@@ -241,26 +232,25 @@ int Scaffolds::buildCore() {
         if (c == '+') {
           state = IN_QUAL;
           if (c != '\n')
-            while ((c = bgzf_getc(bgzf)) >= 0 && c != '\n')
-              ;
+            while ((c = bgzf_getc(bgzf)) >= 0 && c != '\n') {
+            }
           line_num++;
           continue;
         } else {
-          cout << "Format error, expecting '+', got " << c << " at line "
-               << line_num << endl;
-          throw logic_error("");
+          std::cout << "Format error, expecting '+', got " << c << " at line "
+                    << line_num << std::endl;
+          throw std::logic_error("");
         }
         break;
 
       case IN_QUAL:
         if (c == '\n') {
           if (!read_done) {
-            cout << "Inlined empty line is not allowed in "
-                    "quality of sequence "
-                 << bufname.str() << endl;
-            throw logic_error("");
+            std::cout << "Inlined empty line is not allowed in "
+                         "quality of sequence "
+                      << bufname.str() << std::endl;
+            throw std::logic_error("");
           }
-
           state = OUT_READ;
           line_num++;
           continue;
@@ -270,7 +260,6 @@ int Scaffolds::buildCore() {
         }
 
         ll = cl = 0;
-
         do {
           ll++;
           if (isgraph(c))
@@ -279,75 +268,71 @@ int Scaffolds::buildCore() {
 
         ll++;
         qual_len += cl;
-
         if (line_len < ll) {
-          cout << "Quality line length too long int in " << bufname.str()
-               << " at line " << line_num << endl;
-          throw logic_error("");
+          std::cout << "Quality line length too long int in " << bufname.str()
+                    << " at line " << line_num << std::endl;
+          throw std::logic_error("");
         } else if (qual_len == seq_len) {
           read_done = 1;
         } else if (qual_len > seq_len) {
-          cout << "Quality length long inter than sequence in " << bufname.str()
-               << " at line " << line_num << endl;
-          throw logic_error("");
+          std::cout << "Quality length long inter than sequence in "
+                    << bufname.str() << " at line " << line_num << std::endl;
+          throw std::logic_error("");
         } else if (line_len > ll) {
-          cout << "Quality line length too short in " << bufname.str()
-               << " at line " << line_num << endl;
-          throw logic_error("");
+          std::cout << "Quality line length too short in " << bufname.str()
+                    << " at line " << line_num << std::endl;
+          throw std::logic_error("");
         }
-
         line_num++;
         break;
       }
-
-    }
-
-    catch (const std::exception &e) {
+    } catch (const std::exception &e) {
       std::cerr << e.what();
     }
   }
 
   if (read_done) {
     if (!inN && insertIndex(bufname.str(), start, stop) != 0) {
-      throw logic_error("Read done, error throw");
+      throw std::logic_error("Read done, error throw");
     }
   } else {
-    throw logic_error("");
+    throw std::logic_error("");
   }
 
   return 0;
 }
 
-string Scaffolds::toString() {
-  stringstream buf;
+std::string Scaffolds::toString() {
+  std::stringstream buf;
   for (Scaffold f : scaffolds) {
-    buf << f.getName() << '\t' << f.getStart() << '\t' << f.getStop() << endl;
+    buf << f.getName() << '\t' << f.getStart() << '\t' << f.getStop()
+        << std::endl;
   }
   return buf.str();
 }
 
 int Scaffolds::save() {
-  ofstream flux(output.c_str());
+  std::ofstream flux(output.c_str());
   if (!flux) {
-    throw logic_error("Output isn't writable");
+    throw std::logic_error("Output isn't writable");
   }
   flux << toString();
   return 0;
 }
 
 int Scaffolds::load(int gt) {
-  string info;
-  vector<string> tokens;
+  std::string info;
+  std::vector<std::string> tokens;
 
   // Read file
-  ifstream flux(output.c_str());
+  std::ifstream flux(output.c_str());
   if (!flux) {
-    throw logic_error("Error when read index file");
+    throw std::logic_error("Error when read index file");
   }
   while (getline(flux, info)) {
     tokens = Tools::split(info.c_str(), "\t");
     if (tokens.size() != 3) {
-      throw logic_error("Index file is malformated ?");
+      throw std::logic_error("Index file is malformated ?");
     }
     if (stol(tokens[2]) - stol(tokens[1]) >= gt) {
       insertIndex(tokens[0], stol(tokens[1]), stol(tokens[2]));
@@ -358,7 +343,7 @@ int Scaffolds::load(int gt) {
 }
 
 void Scaffolds::initMembers() {
-  long long int length = 0, length_sum = 0;
+  int64_t length = 0, length_sum = 0;
   for (auto &f : scaffolds) {
     length = f.getStop() - f.getStart();
     length_sum += length;
@@ -366,10 +351,7 @@ void Scaffolds::initMembers() {
     intervals.push_back(length_sum);
   }
 }
-long long int Scaffolds::getTotalLength() const noexcept {
-  return length_scaffolds;
-}
-
-vector<long long int> Scaffolds::getIntervals() const noexcept {
+int64_t Scaffolds::getTotalLength() const noexcept { return length_scaffolds; }
+std::vector<int64_t> Scaffolds::getIntervals() const noexcept {
   return intervals;
 }

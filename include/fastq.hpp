@@ -17,7 +17,7 @@ private:
   int phred_offset = 33;
 
   // Format name
-  long int number = 0;
+  int64_t number = 0;
   bool strand = false;
   std::string reference = "";
   std::string chromosome = "";
@@ -25,8 +25,8 @@ private:
   int end = 0;
 
 public:
-  Fastq(std::string);
-  Fastq(std::string, int, long int, bool, std::string, std::string, int, int);
+  explicit Fastq(std::string);
+  Fastq(std::string, int, int64_t, bool, std::string, std::string, int, int);
   ~Fastq();
   Fastq(Fastq const &);
 

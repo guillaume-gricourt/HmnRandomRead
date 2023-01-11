@@ -20,7 +20,7 @@ private:
   bool usage_visible = false;
   std::string read1 = "";
   std::string read2 = "";
-  long long int seed = 0;
+  int64_t seed = 0;
 
   std::string profile_error_id = "";
 
@@ -28,7 +28,7 @@ private:
   std::shared_ptr<ProfileError> profile_error = nullptr;
 
 public:
-  Args(std::string);
+  explicit Args(std::string);
   ~Args() = default;
 
   // Getters Setters
@@ -40,7 +40,7 @@ public:
   std::string getRead1() const noexcept;
   std::string getRead2() const noexcept;
   std::string getProfileErrorId() const noexcept;
-  long long int getSeed() const noexcept;
+  int64_t getSeed() const noexcept;
 
   std::shared_ptr<ProfileError> getProfileError() noexcept;
   std::shared_ptr<ProfileDiversity> getProfileDiversity() noexcept;

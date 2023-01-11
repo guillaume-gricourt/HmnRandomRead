@@ -17,7 +17,7 @@ private:
 
 public:
   Faidxr(std::string, std::string);
-  Faidxr(std::string);
+  explicit Faidxr(std::string);
   Faidxr();
   ~Faidxr();
   Faidxr &operator=(const Faidxr &) = default;
@@ -31,13 +31,12 @@ public:
 
   // Proper
   std::vector<Faidx> getVector();
-  int insertIndex(const std::string, const long long int, const long long int,
-                  const int, const int, const int);
+  int insertIndex(const std::string, const int64_t, const int64_t, const int,
+                  const int, const int);
 
-  std::string retrieve(Faidx *, const long long int, const long long int,
-                       const long long int);
-  int getVal(Faidx *, const std::string, long long int *, long long int *);
+  std::string retrieve(Faidx *, const int64_t, const int64_t, const int64_t);
+  int getVal(Faidx *, const std::string, int64_t *, int64_t *);
   std::string fetch(const std::string);
 };
 
-#endif // INLCUDE_FAIDXR_HPP_
+#endif // INCLUDE_FAIDXR_HPP_

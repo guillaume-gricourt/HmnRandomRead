@@ -16,7 +16,7 @@ private:
   std::map<std::string, std::shared_ptr<Diversity>> data;
 
 public:
-  ProfileDiversity(std::string);
+  explicit ProfileDiversity(std::string);
   ProfileDiversity &operator=(const ProfileDiversity &) = default;
   // inherit
   ~ProfileDiversity() = default;
