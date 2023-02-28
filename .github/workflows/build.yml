@@ -70,7 +70,7 @@ jobs:
       version_path: ${{ steps.update_version.outputs.version_path }}
       version_dir: ${{ steps.update_version.outputs.version_dir }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           ref: stable
       - name: 'Update version.hpp'
@@ -98,7 +98,7 @@ jobs:
     steps:
       # Get Data
       - name: 'Checkout'
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           persist-credentials: false
           fetch-depth: 0
