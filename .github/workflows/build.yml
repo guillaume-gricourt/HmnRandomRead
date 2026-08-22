@@ -73,16 +73,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: stable
-      - name: 'Update version.hpp'
+      - name: 'Update Cargo.toml version'
         id: update_version
         env:
           TAG: ${{ needs.TagRaw.outputs.tag }}
         run: |
-          VERSION_PATH=$(find . -name version.hpp | head -n 1)
+          VERSION_PATH=Cargo.toml
           VERSION_DIR=$(dirname "$VERSION_PATH")
-          cur=$(date "+%b. %Y")
-          sed -i "5s/\".*\"/\"$TAG\"/" "$VERSION_PATH"
-          sed -i "6s/\".*\"/\"$cur\"/" "$VERSION_PATH"
+          sed -i "0,/^version = \".*\"/s//version = \"$TAG\"/" "$VERSION_PATH"
           echo "version_path=$VERSION_PATH" >> "$GITHUB_OUTPUT"
           echo "version_dir=$VERSION_DIR" >> "$GITHUB_OUTPUT"
       - name: 'Upload Artifact Version'
