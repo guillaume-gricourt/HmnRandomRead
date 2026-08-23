@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.0](https://github.com/guillaume-gricourt/HmnRandomRead/tree/0.10.0) (2023-01-11)
+
+[Full Changelog](https://github.com/guillaume-gricourt/HmnRandomRead/compare/0.9.1...0.10.0)
+
+**Merged pull requests:**
+
+- Refactor [\#1](https://github.com/guillaume-gricourt/HmnRandomRead/pull/1) ([guillaume-gricourt](https://github.com/guillaume-gricourt))
+
 ## [0.9.1](https://github.com/guillaume-gricourt/HmnRandomRead/tree/0.9.1) (2022-12-24)
 
 [Full Changelog](https://github.com/guillaume-gricourt/HmnRandomRead/compare/0.9.0...0.9.1)

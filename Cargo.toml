@@ -1,6 +1,6 @@
 [package]
 name = "hmnrandomread"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2021"
 description = "Simulate paired-end FASTQ reads from reference genomes"
 license = "MIT"
