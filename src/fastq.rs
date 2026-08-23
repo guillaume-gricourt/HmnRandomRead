@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::profile_error::ProfileError;
+use crate::profile_sequencer::ProfileSequencer;
 use crate::rng::RandomGenerator;
 use crate::sequence::choose_base;
 
@@ -48,7 +48,7 @@ impl FastqRecord {
     }
 
     /// `0` for the forward-strand mate, `1` for the other — matches
-    /// [`crate::profile_error::FORWARD`]/[`crate::profile_error::REVERSE`].
+    /// [`crate::profile_sequencer::FORWARD`]/[`crate::profile_sequencer::REVERSE`].
     pub fn mate(&self) -> u8 {
         if self.forward {
             0
@@ -78,7 +78,7 @@ impl FastqRecord {
 
     /// Introduce sequencing errors per-cycle according to `profile`, mutating
     /// both the base and its quality score wherever an error is drawn.
-    pub fn make_errors(&mut self, rng: &mut RandomGenerator, profile: &ProfileError) {
+    pub fn make_errors(&mut self, rng: &mut RandomGenerator, profile: &ProfileSequencer) {
         let strand = self.mate();
         let mut bytes = std::mem::take(&mut self.sequence).into_bytes();
         for (i, base) in bytes.iter_mut().enumerate() {

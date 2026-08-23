@@ -6,7 +6,7 @@ use std::error::Error;
 use crate::diversity::ProfileDiversity;
 use crate::fastq::FastqRecord;
 use crate::io::FastqWriter;
-use crate::profile_error::ProfileError;
+use crate::profile_sequencer::ProfileSequencer;
 use crate::reference::Reference;
 use crate::rng::RandomGenerator;
 use crate::sequence::Sequence;
@@ -19,7 +19,7 @@ pub struct Config {
     pub std_insert_size: f64,
     pub seed: u64,
     pub profile_diversity: Option<ProfileDiversity>,
-    pub profile_error: Option<ProfileError>,
+    pub profile_sequencer: Option<ProfileSequencer>,
 }
 
 pub struct Generator {
@@ -128,9 +128,9 @@ impl Generator {
 
             head.init_qual(&mut rng);
             tail.init_qual(&mut rng);
-            if let Some(profile_error) = &self.config.profile_error {
-                head.make_errors(&mut rng, profile_error);
-                tail.make_errors(&mut rng, profile_error);
+            if let Some(profile_sequencer) = &self.config.profile_sequencer {
+                head.make_errors(&mut rng, profile_sequencer);
+                tail.make_errors(&mut rng, profile_sequencer);
             }
 
             let (r1, r2) = if rng.unit() >= 0.5 {
@@ -249,7 +249,7 @@ mod tests {
             std_insert_size: 20.0,
             seed: 42,
             profile_diversity: None,
-            profile_error: None,
+            profile_sequencer: None,
         };
         let out1 = dir.path().join("r1.fastq.gz");
         let out2 = dir.path().join("r2.fastq.gz");
@@ -280,7 +280,7 @@ mod tests {
                 std_insert_size: 10.0,
                 seed,
                 profile_diversity: None,
-                profile_error: None,
+                profile_sequencer: None,
             };
             let out1 = dir.path().join(format!("a{seed}.fastq.gz"));
             let out2 = dir.path().join(format!("b{seed}.fastq.gz"));
@@ -318,7 +318,7 @@ mod tests {
             std_insert_size: 10.0,
             seed: 1,
             profile_diversity: Some(profile),
-            profile_error: None,
+            profile_sequencer: None,
         };
         assert!(Generator::new(vec![reference], config).is_err());
     }
