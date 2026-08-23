@@ -1,40 +1,13 @@
-name: Tests
+name: Rust
 
 on: [push, fork]
 
 jobs:
-
-  MakeTest:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash -el {0}
-    steps:
-      - name: 'Checkout'
-        uses: actions/checkout@v3
-      - name: 'Deploying miniconda'
-        uses: conda-incubator/setup-miniconda@v2
-        with:
-          miniconda-version: 'latest'
-          environment-file: recipes/workflow.yaml
-          auto-activate-base: false
-          activate-environment: test
-      - name: 'Tests'
-        run: |
-          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA/envs/test/lib
-          make LIBS="-I include -I $CONDA/envs/test/include -L $CONDA/envs/test/lib" test
-
-  Lint:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: 'Checkout'
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ github.ref }}
-          fetch-depth: 0
-      - name: Lint Code Base
-        uses: github/super-linter@v4
-        env:
-          FILTER_REGEX_EXCLUDE: "./lib/.*"
-          DEFAULT_BRANCH: ${{ github.ref }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
+      - name: Build
+        run: cargo build --verbose
+      - name: Run tests
+        run: cargo test --verbose
