@@ -14,16 +14,16 @@ fn parse_err(msg: impl Into<String>) -> Box<dyn Error> {
 pub const REVERSE: u8 = 0;
 pub const FORWARD: u8 = 1;
 
-/// A parsed `-profileError` CSV file: per-cycle substitution error rate for
+/// A parsed `-profileSequencer` CSV file: per-cycle substitution error rate for
 /// one or both strands of a single sequencer/id.
 #[derive(Clone, Debug, Default)]
-pub struct ProfileError {
+pub struct ProfileSequencer {
     pub version: f32,
     errors: HashMap<u8, Vec<f32>>,
 }
 
-impl ProfileError {
-    /// Parse a profile error CSV for the row(s) matching `id`:
+impl ProfileSequencer {
+    /// Parse a profile sequencer CSV for the row(s) matching `id`:
     /// ```text
     /// ##Version: 1.0
     /// #identifiant,sequencer,flowcell,version,strand,cycles total,error by cycle
@@ -39,7 +39,7 @@ impl ProfileError {
         is_paired: bool,
     ) -> Result<Self, Box<dyn Error>> {
         let file = File::open(path)?;
-        let mut profile = ProfileError::default();
+        let mut profile = ProfileSequencer::default();
         let mut last_strand = FORWARD;
 
         for (i, line) in BufReader::new(file).lines().enumerate() {
@@ -48,14 +48,14 @@ impl ProfileError {
                 0 => {
                     let fields: Vec<&str> = line.split(' ').collect();
                     if fields.len() != 2 || !fields[0].starts_with("##") {
-                        return Err(parse_err("profile error version line malformatted"));
+                        return Err(parse_err("profile sequencer version line malformatted"));
                     }
                     profile.version = fields[1].parse()?;
                 }
                 1 => {
                     let fields: Vec<&str> = line.split(',').collect();
                     if fields.len() != 7 || !fields[0].starts_with('#') {
-                        return Err(parse_err("profile error header malformatted"));
+                        return Err(parse_err("profile sequencer header malformatted"));
                     }
                 }
                 _ => {
@@ -102,7 +102,7 @@ impl ProfileError {
             }
         } else if profile.errors.len() == 1 && last_strand == FORWARD {
             return Err(parse_err(
-                "only strand reverse error profile was found, only forward profile error \
+                "only strand reverse error profile was found, only forward profile sequencer \
                  for forward fastq to produce must be indicated",
             ));
         } else if profile.errors.len() > 1 {
@@ -126,7 +126,7 @@ mod tests {
     use std::io::Write;
 
     fn write_profile(dir: &Path, contents: &str) -> std::path::PathBuf {
-        let path = dir.join("profile_error.csv");
+        let path = dir.join("profile_sequencer.csv");
         let mut f = File::create(&path).unwrap();
         f.write_all(contents.as_bytes()).unwrap();
         path
@@ -141,7 +141,7 @@ mod tests {
             "{HEADER}n1,seq,flow,NA,forward,3,1;2;3\nn1,seq,flow,NA,reverse,3,4;5;6\n"
         );
         let path = write_profile(dir.path(), &contents);
-        let profile = ProfileError::parse_csv(&path, "n1", true).unwrap();
+        let profile = ProfileSequencer::parse_csv(&path, "n1", true).unwrap();
         assert_eq!(profile.rate(FORWARD, 0).unwrap(), 0.01);
         assert_eq!(profile.rate(REVERSE, 2).unwrap(), 0.06);
     }
@@ -151,7 +151,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let contents = format!("{HEADER}n1,seq,flow,NA,reverse,2,1;2\n");
         let path = write_profile(dir.path(), &contents);
-        let profile = ProfileError::parse_csv(&path, "n1", true).unwrap();
+        let profile = ProfileSequencer::parse_csv(&path, "n1", true).unwrap();
         assert_eq!(profile.rate(REVERSE, 0), profile.rate(FORWARD, 0));
     }
 
@@ -160,7 +160,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let contents = format!("{HEADER}n1,seq,flow,NA,forward,2,1;2\n");
         let path = write_profile(dir.path(), &contents);
-        assert!(ProfileError::parse_csv(&path, "n1", false).is_err());
+        assert!(ProfileSequencer::parse_csv(&path, "n1", false).is_err());
     }
 
     #[test]
@@ -168,6 +168,6 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let contents = format!("{HEADER}n1,seq,flow,NA,forward,5,1;2\n");
         let path = write_profile(dir.path(), &contents);
-        assert!(ProfileError::parse_csv(&path, "n1", false).is_err());
+        assert!(ProfileSequencer::parse_csv(&path, "n1", false).is_err());
     }
 }
