@@ -52,6 +52,10 @@ HmnRandomRead build-profile-sequencer \
     --input-bam <string, optional> \
     --output-profile-sequencer-csv <string, required>
 
+HmnRandomRead statistics-insert-size \
+    --input-bam <string, required> \
+    --input-bed <string, optional>
+
 HmnRandomRead version
 ```
 
@@ -137,6 +141,31 @@ HmnRandomRead build-profile-sequencer \
   correct cycle (important on the reverse strand, where clipped/retained
   regions get reordered).
 - `error_by_cycle` is derived from the average base quality at each cycle.
+
+### Compute the insert size from real data
+
+`statistics-insert-size` reports the mean and standard deviation of the
+fragment insert size (for `--parameter-mean-insert-int` /
+`--parameter-std-insert-int`) from one or more real BAMs, optionally
+restricted to a set of regions:
+
+```sh
+HmnRandomRead statistics-insert-size \
+    --input-bam sample.bam
+
+HmnRandomRead statistics-insert-size \
+    --input-bam lane1.bam lane2.bam \
+    --input-bed targets.bed
+```
+
+- `--input-bam` accepts a space-separated list of BAMs (e.g. one per lane);
+  their read pairs are pooled into a single result.
+- `--input-bed` restricts the tally to read pairs whose first-in-template
+  alignment overlaps at least one region listed in the BED file (`chrom`,
+  `start`, `end`, 0-based half-open) — useful to compute the insert size
+  observed only over a capture/target region.
+- Only primary, mapped, properly-paired alignments are counted, once per
+  pair, from the BAM's `TLEN` field.
 
 ## Test
 

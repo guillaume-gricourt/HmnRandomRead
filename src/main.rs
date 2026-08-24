@@ -2,7 +2,10 @@ use std::path::Path;
 
 use clap::{Parser, Subcommand};
 
-use hmnrandomread::{BuiltProfile, Config, Generator, ProfileDiversity, ProfileSequencer, Reference};
+use hmnrandomread::{
+    BuiltProfile, Config, Generator, InsertSizeStats, ProfileDiversity, ProfileSequencer,
+    Reference,
+};
 
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -95,6 +98,19 @@ enum Commands {
         #[arg(long)]
         output_profile_sequencer_csv: String,
     },
+    /// Report the mean and standard deviation of the fragment insert size
+    /// (for `--parameter-mean-insert-int`/`--parameter-std-insert-int`) from
+    /// one or more real BAMs.
+    StatisticsInsertSize {
+        /// BAM(s), space-separated; pooled into a single result.
+        #[arg(long, num_args = 1.., required = true)]
+        input_bam: Vec<String>,
+
+        /// BED file restricting the tally to read pairs overlapping its
+        /// regions (e.g. a capture/target BED).
+        #[arg(long)]
+        input_bed: Option<String>,
+    },
     /// Display the application version.
     Version,
 }
@@ -106,6 +122,9 @@ fn main() {
         Commands::Simulate { .. } => std::process::exit(cmd_simulate(&cli.command)),
         Commands::BuildProfileSequencer { .. } => {
             std::process::exit(cmd_build_profile_sequencer(&cli.command))
+        }
+        Commands::StatisticsInsertSize { .. } => {
+            std::process::exit(cmd_statistics_insert_size(&cli.command))
         }
         Commands::Version => println!("{VERSION}"),
     }
@@ -342,6 +361,53 @@ fn cmd_build_profile_sequencer(command: &Commands) -> i32 {
     }
 }
 
+fn cmd_statistics_insert_size(command: &Commands) -> i32 {
+    let Commands::StatisticsInsertSize {
+        input_bam,
+        input_bed,
+    } = command
+    else {
+        unreachable!("cmd_statistics_insert_size is only called for Commands::StatisticsInsertSize");
+    };
+
+    println!(
+        "statistics-insert-size: starting ({} BAM file(s))",
+        input_bam.len()
+    );
+
+    for path in input_bam {
+        if !Path::new(path).is_file() {
+            log::error!("input file not found: {path}");
+            return 1;
+        }
+    }
+    if let Some(path) = input_bed {
+        if !Path::new(path).is_file() {
+            log::error!("BED file not found: {path}");
+            return 1;
+        }
+    }
+
+    let stats = match InsertSizeStats::from_bam(input_bam, input_bed.as_deref()) {
+        Ok(stats) => stats,
+        Err(e) => {
+            log::error!("{e}");
+            return 1;
+        }
+    };
+
+    println!(
+        "statistics-insert-size: {} read pair(s) — mean={:.2}, std={:.2}",
+        stats.n, stats.mean, stats.std
+    );
+    println!(
+        "statistics-insert-size: --parameter-mean-insert-int {} --parameter-std-insert-int {}",
+        stats.mean.round() as i64,
+        stats.std.round() as i64
+    );
+    0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -488,6 +554,48 @@ mod tests {
             "profile_sequencer.csv",
         ]);
         assert_eq!(cmd_build_profile_sequencer(&cli.command), 1);
+    }
+
+    #[test]
+    fn statistics_insert_size_parses() {
+        let cli = Cli::parse_from([
+            APP_NAME,
+            "statistics-insert-size",
+            "--input-bam",
+            "a.bam",
+            "b.bam",
+            "--input-bed",
+            "targets.bed",
+        ]);
+        let Commands::StatisticsInsertSize {
+            input_bam,
+            input_bed,
+        } = &cli.command
+        else {
+            panic!("expected Commands::StatisticsInsertSize");
+        };
+        assert_eq!(input_bam, &vec!["a.bam".to_string(), "b.bam".to_string()]);
+        assert_eq!(input_bed.as_deref(), Some("targets.bed"));
+    }
+
+    #[test]
+    fn statistics_insert_size_bed_is_optional() {
+        let cli = Cli::parse_from([
+            APP_NAME,
+            "statistics-insert-size",
+            "--input-bam",
+            "a.bam",
+        ]);
+        let Commands::StatisticsInsertSize { input_bed, .. } = &cli.command else {
+            panic!("expected Commands::StatisticsInsertSize");
+        };
+        assert!(input_bed.is_none());
+    }
+
+    #[test]
+    fn statistics_insert_size_requires_input_bam() {
+        let result = Cli::try_parse_from([APP_NAME, "statistics-insert-size"]);
+        assert!(result.is_err());
     }
 
     #[test]

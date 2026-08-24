@@ -1,6 +1,7 @@
 pub mod diversity;
 pub mod fastq;
 pub mod generator;
+pub mod insert_size;
 pub mod io;
 pub mod profile_builder;
 pub mod profile_sequencer;
@@ -13,6 +14,7 @@ pub mod sequencer;
 pub use diversity::{Diversity, ProfileDiversity};
 pub use fastq::FastqRecord;
 pub use generator::{Config, Generator};
+pub use insert_size::InsertSizeStats;
 pub use io::{FastaIndexedReader, FastqReader, FastqWriter};
 pub use profile_builder::BuiltProfile;
 pub use profile_sequencer::ProfileSequencer;
