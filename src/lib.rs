@@ -1,5 +1,6 @@
 pub mod diversity;
 pub mod fastq;
+pub mod fusion;
 pub mod generator;
 pub mod insert_size;
 pub mod io;
@@ -13,6 +14,7 @@ pub mod sequencer;
 
 pub use diversity::{Diversity, ProfileDiversity};
 pub use fastq::FastqRecord;
+pub use fusion::{Breakpoint, FusionConfig, FusionGenerator};
 pub use generator::{Config, Generator};
 pub use insert_size::InsertSizeStats;
 pub use io::{FastaIndexedReader, FastqReader, FastqWriter};

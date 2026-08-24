@@ -11,6 +11,8 @@
 - adapt the error model coming from your sequencer
 - eventually add SNPs to introduce diversity
 - generate around 1000 sequences by second
+- spike a real sample's FASTQ with a synthetic gene fusion / SV breakpoint
+  at a controllable allele fraction
 
 ## Install
 
@@ -54,7 +56,27 @@ HmnRandomRead build-profile-sequencer \
 
 HmnRandomRead statistics-insert-size \
     --input-bam <string, required> \
-    --input-bed <string, optional>
+    --output-statistics-csv <string, optional>
+
+HmnRandomRead fusion-in-sample \
+    --input-reference-fasta <string, required><int, optional><string, optional> \
+    --input-forward-fastq <string, required> \
+    --input-reverse-fastq <string, required> \
+    --input-bam <string, required> \
+    --parameter-breakpoint-primary-roi <string, required> \
+    --parameter-breakpoint-secondary-roi <string, required> \
+    --parameter-rate-float <float, required> \
+    --output-forward-fastq <string, required> \
+    --output-reverse-fastq <string, required> \
+
+    --parameter-length-reads-int <int, optional, 150> \
+    --parameter-mean-insert-int <int, optional, 500> \
+    --parameter-std-insert-int <int, optional, 50> \
+
+    --input-profile-diversity-csv <string, optional> \
+    --input-profile-sequencer-csv <string, optional> \
+    --parameter-profile-sequencer-id-str <string, optional> \
+    --parameter-seed-int <int, optional, 0>
 
 HmnRandomRead version
 ```
@@ -146,8 +168,7 @@ HmnRandomRead build-profile-sequencer \
 
 `statistics-insert-size` reports the mean and standard deviation of the
 fragment insert size (for `--parameter-mean-insert-int` /
-`--parameter-std-insert-int`) from one or more real BAMs, optionally
-restricted to a set of regions:
+`--parameter-std-insert-int`) for each of one or more real BAMs:
 
 ```sh
 HmnRandomRead statistics-insert-size \
@@ -155,17 +176,67 @@ HmnRandomRead statistics-insert-size \
 
 HmnRandomRead statistics-insert-size \
     --input-bam lane1.bam lane2.bam \
-    --input-bed targets.bed
+    --output-statistics-csv insert_size_stats.csv
 ```
 
-- `--input-bam` accepts a space-separated list of BAMs (e.g. one per lane);
-  their read pairs are pooled into a single result.
-- `--input-bed` restricts the tally to read pairs whose first-in-template
-  alignment overlaps at least one region listed in the BED file (`chrom`,
-  `start`, `end`, 0-based half-open) — useful to compute the insert size
-  observed only over a capture/target region.
+- `--input-bam` accepts a space-separated list of BAMs (e.g. one per
+  sample/lane); each is reported as its own row, not pooled together.
 - Only primary, mapped, properly-paired alignments are counted, once per
   pair, from the BAM's `TLEN` field.
+- `--output-statistics-csv`, if given, writes a CSV with one row per
+  `--input-bam`: `file`, `mean_insert_size`, `std_insert_size`.
+
+### Spike a real sample with a fusion breakpoint
+
+`fusion-in-sample` adds synthetic read pairs supporting a gene fusion /
+structural-variant breakpoint to a real sample's paired FASTQ, at a depth
+proportional to the real coverage already present at the breakpoint —
+useful to build fusion-calling validation datasets with a known, controllable
+allele fraction. It reuses `simulate`'s reference, diversity, sequencer
+error, insert size, and seed options:
+
+```sh
+HmnRandomRead fusion-in-sample \
+    --input-reference-fasta genome.fa \
+    --input-forward-fastq sample_R1.fastq.gz \
+    --input-reverse-fastq sample_R2.fastq.gz \
+    --input-bam sample.bam \
+    --parameter-breakpoint-primary-roi chr9:130854064 \
+    --parameter-breakpoint-secondary-roi chr22:23632600 \
+    --parameter-rate-float 0.1 \
+    --output-forward-fastq spiked_R1.fastq.gz \
+    --output-reverse-fastq spiked_R2.fastq.gz
+```
+
+- `--input-forward-fastq`/`--input-reverse-fastq` (plain or gzip-compressed)
+  and `--input-bam` (indexed, with a `.bai`/`.csi` sidecar) are the real
+  sample's data; all three are required. The output FASTQs contain every
+  record from the input FASTQs plus the produced fusion reads appended —
+  the input files themselves are never modified.
+- `--parameter-breakpoint-primary-roi`/`--parameter-breakpoint-secondary-roi`
+  (`chrom:pos`, 1-based) are the two breakpoint partners. `pos` is the last
+  reference base kept on the 5' side of the junction for that partner; the
+  base right after it starts its 3' side.
+- Two chimeric junction sequences are built from the reference: one with the
+  primary breakpoint's upstream sequence on the left and the secondary's
+  downstream sequence on the right, and the reciprocal (secondary left,
+  primary right) — the two derivative junctions of the fusion. Fragments are
+  drawn from each junction using the same insert-size gaussian as
+  `simulate` (`--parameter-mean-insert-int`/`--parameter-std-insert-int`),
+  placed with a gaussian jitter around the junction; a fragment that doesn't
+  end up straddling the junction doesn't support the fusion and is
+  discarded and redrawn.
+- The number of fusion read pairs produced is `round(depth × rate)`, split
+  evenly across the two junction orientations, where `depth` is the real
+  pileup depth of `--input-bam` at the primary breakpoint position and
+  `rate` is `--parameter-rate-float` (0.0-0.5).
+- `nb_reads` in an `--input-reference-fasta` spec is ignored by this
+  command — the read count comes from depth × rate instead; `id_diversity`
+  is still applied (from the reference matching the primary breakpoint) if
+  `--input-profile-diversity-csv` is given.
+- Produced reads are tagged `fusion` in their FASTQ header, with the
+  breakpoint pair (e.g. `chr9:130854064>chr22:23632600`) in place of a
+  chromosome name.
 
 ## Test
 
