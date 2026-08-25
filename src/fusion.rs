@@ -9,7 +9,7 @@ use std::io;
 use rust_htslib::bam::{self, Read as BamRead};
 
 use crate::diversity::ProfileDiversity;
-use crate::fastq::FastqRecord;
+use crate::fastq::{build_read_pair, FastqRecord};
 use crate::io::FastaIndexedReader;
 use crate::profile_sequencer::ProfileSequencer;
 use crate::rng::RandomGenerator;
@@ -87,6 +87,17 @@ fn fetch_flank(
     }
 }
 
+/// Unlike `simulate`, which only ever draws fragments from non-N
+/// [`crate::scaffold::Scaffolds`] runs, a breakpoint here is an exact
+/// coordinate the user asked for — there's no other position to silently
+/// fall back to. Rather than let an assembly gap near the breakpoint
+/// produce synthetic reads full of literal `N` bases (which no real
+/// sequencer emits, and which downstream aligners would mishandle), flag it
+/// as a clear error instead.
+fn contains_n(seq: &str) -> bool {
+    seq.bytes().any(|b| b.eq_ignore_ascii_case(&b'N'))
+}
+
 /// Build a chimeric junction sequence: `left_bp`'s upstream flank followed by
 /// `right_bp`'s downstream flank. Returns the concatenated sequence and the
 /// 0-based index of its first base belonging to the right partner (i.e. the
@@ -100,13 +111,47 @@ pub fn build_junction(
     flank_len: u64,
 ) -> io::Result<(String, usize)> {
     let left = fetch_flank(left_faidx, left_bp, flank_len, Side::Left)?;
+    if contains_n(&left) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "the {flank_len}bp flank upstream of breakpoint {}:{} contains N bases \
+                 (assembly gap?); pick a breakpoint away from reference gaps",
+                left_bp.chrom, left_bp.pos
+            ),
+        ));
+    }
     let right = fetch_flank(right_faidx, right_bp, flank_len, Side::Right)?;
+    if contains_n(&right) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "the {flank_len}bp flank downstream of breakpoint {}:{} contains N bases \
+                 (assembly gap?); pick a breakpoint away from reference gaps",
+                right_bp.chrom, right_bp.pos
+            ),
+        ));
+    }
     let junction_index = left.len();
     Ok((left + &right, junction_index))
 }
 
+/// Whether an alignment counts toward [`depth_at`]'s depth — matches
+/// `samtools depth`'s default exclude filter (unmapped, secondary, QC-fail,
+/// duplicate), since htslib's pileup engine itself does not filter anything
+/// on its own: without this, `depth_at` would count every alignment
+/// (including secondary/duplicate) and systematically overstate real
+/// coverage relative to what a user comparing against `samtools depth`
+/// would expect.
+fn is_countable(record: &bam::Record) -> bool {
+    !record.is_unmapped()
+        && !record.is_secondary()
+        && !record.is_quality_check_failed()
+        && !record.is_duplicate()
+}
+
 /// Pileup depth at a single 1-based position of an indexed BAM (0 if the
-/// position has no coverage).
+/// position has no coverage), counting only alignments [`is_countable`].
 pub fn depth_at(bam_path: &str, chrom: &str, pos_1based: u64) -> Result<u32, Box<dyn Error>> {
     let mut reader = bam::IndexedReader::from_path(bam_path)?;
     let tid = reader
@@ -119,36 +164,67 @@ pub fn depth_at(bam_path: &str, chrom: &str, pos_1based: u64) -> Result<u32, Box
     for p in reader.pileup() {
         let p = p?;
         if p.tid() == tid && p.pos() as u64 == pos0 {
-            return Ok(p.depth());
+            let depth = p.alignments().filter(|a| is_countable(&a.record())).count() as u32;
+            return Ok(depth);
         }
     }
     Ok(0)
 }
 
-/// Try up to [`MAX_FRAGMENT_ATTEMPTS`] times to draw a fragment (insert-size
-/// gaussian, as in `simulate`) placed by a gaussian jitter around
-/// `junction_index`, keeping only fragments that actually straddle the
-/// junction (`start <= junction_index < stop`) — the read pairs the user
-/// wants discarded are exactly the ones that don't. Returns `None` if every
+/// Try up to [`MAX_FRAGMENT_ATTEMPTS`] times to draw a fragment spanning
+/// `junction_index`. The fragment's length is drawn from the same
+/// insert-size gaussian as `simulate` (`Normal(mean_insert, std_insert)`),
+/// but — unlike an earlier version of this function — its *position* is
+/// then drawn uniformly across the exact range that keeps it spanning the
+/// junction (`[junction_index - size_insert + 1, junction_index]`, clamped
+/// to what fits in `[0, seq_len)`), rather than from a second gaussian
+/// jitter reusing `std_insert`: that conflated two different sources of
+/// variance (fragment-length variability vs. positional variability around
+/// a fixed point) and, for a small `std_insert`, systematically
+/// under-placed the junction near either end of the fragment. A uniform
+/// draw over the valid spanning range matches what a truly random shearing
+/// process would produce, conditioned on the fragment spanning the
+/// junction at all.
+///
+/// A fragment merely *containing* the junction still isn't enough on its
+/// own: only the first/last `length_reads` bases of a fragment are ever
+/// sequenced (see [`crate::fastq::build_read_pair`]), so a junction that
+/// falls in the unsequenced middle of a long fragment would silently
+/// produce a read pair with no trace of the fusion in its actual sequence
+/// (a "supporting" read that isn't represented at the breakpoint at all).
+/// Only fragments where the junction lands inside the head read's window
+/// (`[start, start+length_reads)`) or the tail read's window
+/// (`[stop-length_reads, stop)`) are accepted. Returns `None` if every
 /// attempt failed.
 fn pick_fragment_near_junction(
     seq_len: usize,
     junction_index: usize,
+    length_reads: usize,
     rng: &mut RandomGenerator,
     mean_insert: f64,
     std_insert: f64,
 ) -> Option<(usize, usize)> {
     for _ in 0..MAX_FRAGMENT_ATTEMPTS {
         let size_insert = rng.normal(mean_insert, std_insert).round().max(1.0) as i64;
-        let offset = rng.normal(0.0, std_insert).round() as i64;
-        let center = junction_index as i64 + offset;
-        let start = center - size_insert / 2;
-        let stop = start + size_insert;
-        if start < 0 || stop <= start || stop as usize > seq_len {
+
+        // The range of `start` values for which [start, start+size_insert)
+        // still contains `junction_index`, clamped to what fits in the
+        // junction sequence.
+        let lo = (junction_index as i64 - size_insert + 1).max(0);
+        let hi = (junction_index as i64).min(seq_len as i64 - size_insert);
+        if hi < lo {
             continue;
         }
+        let start = rng.range(lo, hi);
+        let stop = start + size_insert;
         let (start, stop) = (start as usize, stop as usize);
-        if start <= junction_index && junction_index < stop {
+
+        let take = length_reads.min(stop - start);
+        let head_end = start + take;
+        let tail_start = stop - take;
+        let junction_in_head = start <= junction_index && junction_index < head_end;
+        let junction_in_tail = tail_start <= junction_index && junction_index < stop;
+        if junction_in_head || junction_in_tail {
             return Some((start, stop));
         }
     }
@@ -175,9 +251,9 @@ impl FusionGenerator {
 
     /// Generate `n` fusion-supporting read pairs from `junction`, numbered
     /// `start_number..start_number + n`. Read pairs whose fragment can't be
-    /// placed to straddle the junction after [`MAX_FRAGMENT_ATTEMPTS`]
-    /// attempts are skipped (logged), matching `simulate`'s behavior for an
-    /// unfulfillable fragment.
+    /// placed so the junction actually lands in a sequenced read after
+    /// [`MAX_FRAGMENT_ATTEMPTS`] attempts are skipped (logged), matching
+    /// `simulate`'s behavior for an unfulfillable fragment.
     pub fn generate(
         &self,
         junction: &str,
@@ -189,6 +265,7 @@ impl FusionGenerator {
     ) -> (Vec<FastqRecord>, Vec<FastqRecord>) {
         let mut forward = Vec::with_capacity(n as usize);
         let mut reverse = Vec::with_capacity(n as usize);
+        let mut skipped = 0u64;
         let diversity = self
             .config
             .profile_diversity
@@ -201,60 +278,45 @@ impl FusionGenerator {
             let Some((start, stop)) = pick_fragment_near_junction(
                 junction.len(),
                 junction_index,
+                self.config.length_reads,
                 rng,
                 self.config.mean_insert_size,
                 self.config.std_insert_size,
             ) else {
-                log::warn!(
-                    "fusion read {number}: no valid fragment straddling the junction found after \
-                     {MAX_FRAGMENT_ATTEMPTS} attempts, skipping"
+                // Logged at debug rather than warn: with the split-read
+                // requirement above, a low success rate is expected for
+                // some parameter combinations (e.g. mean insert size much
+                // larger than 2*length_reads) and would otherwise flood the
+                // log with one line per skipped read; see the aggregated
+                // warning below instead.
+                log::debug!(
+                    "fusion read {number}: no valid fragment landing the junction in a \
+                     sequenced read found after {MAX_FRAGMENT_ATTEMPTS} attempts, skipping"
                 );
+                skipped += 1;
                 continue;
             };
 
-            let mut sequence = Sequence::new(junction[start..stop].to_string());
-            if let Some(diversity) = diversity {
-                sequence.make_mutation(rng, diversity);
-            }
-
-            let head_seq = sequence.sub_read(self.config.length_reads, true, false);
-            let tail_seq = sequence.sub_read(self.config.length_reads, false, true);
-            let head_len = head_seq.len() as u64;
-            let tail_len = tail_seq.len() as u64;
-
-            let mut head = FastqRecord::new(
-                head_seq,
-                33,
+            let sequence = Sequence::new(junction[start..stop].to_string());
+            let (r1, r2) = build_read_pair(
+                sequence,
+                rng,
+                diversity,
+                self.config.length_reads,
+                self.config.profile_sequencer.as_ref(),
                 number,
-                true,
                 "fusion".to_string(),
                 label.to_string(),
                 start as u64,
-                start as u64 + head_len,
-            );
-            let mut tail = FastqRecord::new(
-                tail_seq,
-                33,
-                number,
-                false,
-                "fusion".to_string(),
-                label.to_string(),
-                (stop as u64).saturating_sub(tail_len),
                 stop as u64,
             );
-
-            head.init_qual(rng);
-            tail.init_qual(rng);
-            if let Some(profile_sequencer) = &self.config.profile_sequencer {
-                head.make_errors(rng, profile_sequencer);
-                tail.make_errors(rng, profile_sequencer);
-            }
-
-            let (r1, r2) = if rng.unit() >= 0.5 { (head, tail) } else { (tail, head) };
             forward.push(r1);
             reverse.push(r2);
         }
 
+        if skipped > 0 {
+            log::warn!("{label}: {skipped} fusion read pair(s) out of {n} requested were skipped");
+        }
         (forward, reverse)
     }
 }
@@ -308,6 +370,26 @@ mod tests {
     }
 
     #[test]
+    fn build_junction_rejects_n_bases_in_the_left_flank() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write_fasta(dir.path(), ">chr1\nACGTNACGTACGTACGTACGT\n");
+        let faidx = FastaIndexedReader::open(&path).unwrap();
+        // pos 5 (1-based) is the 'N': the left flank [1..=5] contains it.
+        let bp = Breakpoint { chrom: "chr1".into(), pos: 5 };
+        assert!(build_junction(&faidx, &bp, &faidx, &bp, 5).is_err());
+    }
+
+    #[test]
+    fn build_junction_rejects_n_bases_in_the_right_flank() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write_fasta(dir.path(), ">chr1\nACGTACGTNACGTACGTACGT\n");
+        let faidx = FastaIndexedReader::open(&path).unwrap();
+        // pos 8 (1-based): the right flank [9..=13] contains the 'N' at pos 9.
+        let bp = Breakpoint { chrom: "chr1".into(), pos: 8 };
+        assert!(build_junction(&faidx, &bp, &faidx, &bp, 5).is_err());
+    }
+
+    #[test]
     fn fetch_flank_clamps_at_contig_start() {
         let dir = tempfile::tempdir().unwrap();
         let path = write_fasta(dir.path(), ">chr1\nACGTACGTAC\n");
@@ -340,18 +422,52 @@ mod tests {
     }
 
     #[test]
-    fn pick_fragment_always_straddles_junction() {
+    fn pick_fragment_always_lands_junction_in_a_sequenced_read() {
+        // mean_insert (300) is well over 2*length_reads (100), so plenty of
+        // straddling fragments would leave the junction stranded in the
+        // unsequenced middle; only the ones near enough to an edge (via the
+        // gaussian jitter) should be accepted.
         let mut rng = RandomGenerator::new(42);
-        let seq_len = 400;
-        let junction_index = 200;
+        let seq_len = 800;
+        let junction_index = 400;
+        let length_reads = 50;
+        let mut found_any = false;
         for _ in 0..200 {
-            if let Some((start, stop)) =
-                pick_fragment_near_junction(seq_len, junction_index, &mut rng, 100.0, 10.0)
-            {
-                assert!(start <= junction_index && junction_index < stop);
+            if let Some((start, stop)) = pick_fragment_near_junction(
+                seq_len,
+                junction_index,
+                length_reads,
+                &mut rng,
+                300.0,
+                50.0,
+            ) {
+                found_any = true;
                 assert!(stop <= seq_len);
+                let take = length_reads.min(stop - start);
+                let junction_in_head = start <= junction_index && junction_index < start + take;
+                let junction_in_tail = stop - take <= junction_index && junction_index < stop;
+                assert!(
+                    junction_in_head || junction_in_tail,
+                    "junction {junction_index} not in a sequenced window of [{start},{stop})"
+                );
             }
         }
+        assert!(found_any);
+    }
+
+    #[test]
+    fn pick_fragment_rejects_junction_stuck_in_the_unsequenced_middle() {
+        // A fragment fixed to [0, 300) with a junction at 150 and
+        // length_reads=50 never puts the junction in a sequenced read
+        // (head covers [0,50), tail covers [250,300)): every attempt must
+        // be rejected.
+        let mut rng = RandomGenerator::new(1);
+        // std tuned so size_insert is deterministically ~300: the only
+        // start that keeps a 300bp fragment inside a 300bp sequence while
+        // spanning position 150 is 0, which strands the junction in the
+        // unsequenced middle every time.
+        let result = pick_fragment_near_junction(300, 150, 50, &mut rng, 300.0, 0.001);
+        assert!(result.is_none());
     }
 
     #[test]
@@ -405,6 +521,38 @@ mod tests {
 
         let depth = depth_at(bam_path.to_str().unwrap(), "chr1", 10).unwrap();
         assert_eq!(depth, 2);
+    }
+
+    #[test]
+    fn depth_at_excludes_secondary_supplementary_and_duplicate_reads() {
+        let dir = tempfile::tempdir().unwrap();
+        let sam_path = dir.path().join("reads.sam");
+        // r1: primary, countable. r2: secondary (flag 256). r3: duplicate
+        // (flag 1024). r4: QC-fail (flag 512). Only r1 should be counted.
+        let sam = "@HD\tVN:1.6\n@SQ\tSN:chr1\tLN:1000\n\
+            r1\t0\tchr1\t1\t60\t50M\t*\t0\t0\tACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTAC\tIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII\n\
+            r2\t256\tchr1\t1\t60\t50M\t*\t0\t0\tACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTAC\tIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII\n\
+            r3\t1024\tchr1\t1\t60\t50M\t*\t0\t0\tACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTAC\tIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII\n\
+            r4\t512\tchr1\t1\t60\t50M\t*\t0\t0\tACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTAC\tIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII\n";
+        std::fs::write(&sam_path, sam).unwrap();
+
+        let bam_path = dir.path().join("reads.bam");
+        {
+            let sam_reader = bam::Reader::from_path(&sam_path).unwrap();
+            let header = bam::Header::from_template(sam_reader.header());
+            let mut writer =
+                bam::Writer::from_path(&bam_path, &header, bam::Format::Bam).unwrap();
+            let mut sam_reader = bam::Reader::from_path(&sam_path).unwrap();
+            let mut record = bam::Record::new();
+            while let Some(result) = sam_reader.read(&mut record) {
+                result.unwrap();
+                writer.write(&record).unwrap();
+            }
+        }
+        bam::index::build(&bam_path, None, bam::index::Type::Bai, 1).unwrap();
+
+        let depth = depth_at(bam_path.to_str().unwrap(), "chr1", 10).unwrap();
+        assert_eq!(depth, 1);
     }
 
     #[test]

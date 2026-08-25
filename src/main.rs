@@ -165,6 +165,18 @@ enum Commands {
         #[arg(long)]
         parameter_rate_float: f64,
 
+        /// Fraction of the produced fusion read pairs assigned to the
+        /// reciprocal junction orientation (secondary breakpoint's upstream
+        /// sequence on the left, primary's downstream sequence on the
+        /// right), rather than the primary->secondary orientation. Range:
+        /// 0.0-1.0. 0.5 (default) splits evenly, as for a balanced
+        /// reciprocal translocation; 0.0 produces only the
+        /// primary->secondary junction (e.g. for an unbalanced fusion where
+        /// only one derivative is relevant); 1.0 produces only the
+        /// reciprocal junction.
+        #[arg(long, default_value_t = 0.5)]
+        parameter_reciprocal_rate_float: f64,
+
         /// Forward read output FASTQ (gzip-compressed): the input forward
         /// FASTQ plus the produced fusion reads.
         #[arg(long)]
@@ -183,8 +195,7 @@ enum Commands {
         #[arg(long, default_value_t = 500)]
         parameter_mean_insert_int: u32,
 
-        /// Standard deviation of the fragment insert size. Also controls
-        /// how far fusion fragments are placed away from the breakpoint.
+        /// Standard deviation of the fragment insert size.
         #[arg(long, default_value_t = 50)]
         parameter_std_insert_int: u32,
 
@@ -526,6 +537,7 @@ fn cmd_fusion_in_sample(command: &Commands) -> i32 {
         parameter_breakpoint_primary_roi,
         parameter_breakpoint_secondary_roi,
         parameter_rate_float,
+        parameter_reciprocal_rate_float,
         output_forward_fastq,
         output_reverse_fastq,
         parameter_length_reads_int,
@@ -547,6 +559,13 @@ fn cmd_fusion_in_sample(command: &Commands) -> i32 {
     if !(0.0..=0.5).contains(parameter_rate_float) {
         log::error!(
             "--parameter-rate-float must be within [0.0, 0.5], got {parameter_rate_float}"
+        );
+        return 1;
+    }
+    if !(0.0..=1.0).contains(parameter_reciprocal_rate_float) {
+        log::error!(
+            "--parameter-reciprocal-rate-float must be within [0.0, 1.0], got \
+             {parameter_reciprocal_rate_float}"
         );
         return 1;
     }
@@ -670,10 +689,11 @@ fn cmd_fusion_in_sample(command: &Commands) -> i32 {
     );
 
     let n_total = (depth as f64 * parameter_rate_float).round() as u64;
-    let n_a = n_total.div_ceil(2);
-    let n_b = n_total - n_a;
+    let n_b = (n_total as f64 * parameter_reciprocal_rate_float).round() as u64;
+    let n_a = n_total - n_b;
     println!(
-        "fusion-in-sample: producing {n_total} fusion-supporting read pair(s) ({n_a} + {n_b})"
+        "fusion-in-sample: producing {n_total} fusion-supporting read pair(s) ({n_a} primary->secondary \
+         + {n_b} reciprocal, --parameter-reciprocal-rate-float {parameter_reciprocal_rate_float})"
     );
 
     let fusion_config = FusionConfig {
@@ -999,6 +1019,7 @@ mod tests {
             input_bam,
             parameter_breakpoint_primary_roi,
             parameter_rate_float,
+            parameter_reciprocal_rate_float,
             parameter_length_reads_int,
             ..
         } = &cli.command
@@ -1010,7 +1031,37 @@ mod tests {
         assert_eq!(input_bam, "sample.bam");
         assert_eq!(parameter_breakpoint_primary_roi, "chr9:130854064");
         assert_eq!(*parameter_rate_float, 0.1);
+        assert_eq!(*parameter_reciprocal_rate_float, 0.5);
         assert_eq!(*parameter_length_reads_int, 150);
+    }
+
+    #[test]
+    fn fusion_in_sample_rejects_reciprocal_rate_out_of_range() {
+        let cli = Cli::parse_from([
+            APP_NAME,
+            "fusion-in-sample",
+            "--input-reference-fasta",
+            "genome.fa",
+            "--input-forward-fastq",
+            "sample_r1.fastq.gz",
+            "--input-reverse-fastq",
+            "sample_r2.fastq.gz",
+            "--input-bam",
+            "sample.bam",
+            "--parameter-breakpoint-primary-roi",
+            "chr9:130854064",
+            "--parameter-breakpoint-secondary-roi",
+            "chr22:23632600",
+            "--parameter-rate-float",
+            "0.1",
+            "--parameter-reciprocal-rate-float",
+            "1.5",
+            "--output-forward-fastq",
+            "out_r1.fastq.gz",
+            "--output-reverse-fastq",
+            "out_r2.fastq.gz",
+        ]);
+        assert_eq!(cmd_fusion_in_sample(&cli.command), 1);
     }
 
     #[test]

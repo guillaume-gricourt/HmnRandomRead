@@ -2,9 +2,10 @@
 
 use std::fmt;
 
+use crate::diversity::Diversity;
 use crate::profile_sequencer::ProfileSequencer;
 use crate::rng::RandomGenerator;
-use crate::sequence::choose_base;
+use crate::sequence::{choose_base, Sequence};
 
 /// One mate of a simulated read pair.
 #[derive(Clone, Debug)]
@@ -91,6 +92,70 @@ impl FastqRecord {
             }
         }
         self.sequence = String::from_utf8(bytes).expect("sequence bytes must remain valid UTF-8");
+    }
+}
+
+/// Build a head/tail FASTQ record pair from `sequence`: apply diversity
+/// mutation (if any), split it into a head/tail read of `length_reads`
+/// bases, draw baseline quality, apply sequencer error (if any), then
+/// randomize which mate lands in the forward/reverse output. Shared by
+/// `simulate`'s `Generator` and `fusion-in-sample`'s `FusionGenerator` — the
+/// only difference between the two is how `sequence`/`location_*` are
+/// picked upstream.
+#[allow(clippy::too_many_arguments)]
+pub fn build_read_pair(
+    mut sequence: Sequence,
+    rng: &mut RandomGenerator,
+    diversity: Option<&Diversity>,
+    length_reads: usize,
+    profile_sequencer: Option<&ProfileSequencer>,
+    number: u64,
+    reference: String,
+    chromosome: String,
+    location_start: u64,
+    location_stop: u64,
+) -> (FastqRecord, FastqRecord) {
+    if let Some(diversity) = diversity {
+        sequence.make_mutation(rng, diversity);
+    }
+
+    let head_seq = sequence.sub_read(length_reads, true, false);
+    let tail_seq = sequence.sub_read(length_reads, false, true);
+    let head_len = head_seq.len() as u64;
+    let tail_len = tail_seq.len() as u64;
+
+    let mut head = FastqRecord::new(
+        head_seq,
+        33,
+        number,
+        true,
+        reference.clone(),
+        chromosome.clone(),
+        location_start,
+        location_start + head_len,
+    );
+    let mut tail = FastqRecord::new(
+        tail_seq,
+        33,
+        number,
+        false,
+        reference,
+        chromosome,
+        location_stop.saturating_sub(tail_len),
+        location_stop,
+    );
+
+    head.init_qual(rng);
+    tail.init_qual(rng);
+    if let Some(profile_sequencer) = profile_sequencer {
+        head.make_errors(rng, profile_sequencer);
+        tail.make_errors(rng, profile_sequencer);
+    }
+
+    if rng.unit() >= 0.5 {
+        (head, tail)
+    } else {
+        (tail, head)
     }
 }
 

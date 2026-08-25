@@ -66,6 +66,7 @@ HmnRandomRead fusion-in-sample \
     --parameter-breakpoint-primary-roi <string, required> \
     --parameter-breakpoint-secondary-roi <string, required> \
     --parameter-rate-float <float, required> \
+    --parameter-reciprocal-rate-float <float, optional, 0.5> \
     --output-forward-fastq <string, required> \
     --output-reverse-fastq <string, required> \
 
@@ -204,6 +205,7 @@ HmnRandomRead fusion-in-sample \
     --parameter-breakpoint-primary-roi chr9:130854064 \
     --parameter-breakpoint-secondary-roi chr22:23632600 \
     --parameter-rate-float 0.1 \
+    --parameter-reciprocal-rate-float 0.5 \
     --output-forward-fastq spiked_R1.fastq.gz \
     --output-reverse-fastq spiked_R2.fastq.gz
 ```
@@ -216,19 +218,29 @@ HmnRandomRead fusion-in-sample \
 - `--parameter-breakpoint-primary-roi`/`--parameter-breakpoint-secondary-roi`
   (`chrom:pos`, 1-based) are the two breakpoint partners. `pos` is the last
   reference base kept on the 5' side of the junction for that partner; the
-  base right after it starts its 3' side.
+  base right after it starts its 3' side. If either breakpoint's flank
+  contains an `N` (assembly gap), the command fails with a clear error
+  rather than emitting reads full of `N`.
 - Two chimeric junction sequences are built from the reference: one with the
   primary breakpoint's upstream sequence on the left and the secondary's
   downstream sequence on the right, and the reciprocal (secondary left,
-  primary right) — the two derivative junctions of the fusion. Fragments are
-  drawn from each junction using the same insert-size gaussian as
-  `simulate` (`--parameter-mean-insert-int`/`--parameter-std-insert-int`),
-  placed with a gaussian jitter around the junction; a fragment that doesn't
-  end up straddling the junction doesn't support the fusion and is
-  discarded and redrawn.
-- The number of fusion read pairs produced is `round(depth × rate)`, split
-  evenly across the two junction orientations, where `depth` is the real
-  pileup depth of `--input-bam` at the primary breakpoint position and
+  primary right) — the two derivative junctions of the fusion.
+  `--parameter-reciprocal-rate-float` (0.0-1.0, default 0.5) is the fraction
+  of produced pairs assigned to the reciprocal orientation: 0.5 splits
+  evenly (a balanced reciprocal translocation), 0.0 produces only the
+  primary→secondary junction (e.g. an unbalanced fusion where only one
+  derivative matters), 1.0 only the reciprocal one.
+- Fragment length is drawn from the same insert-size gaussian as `simulate`
+  (`--parameter-mean-insert-int`/`--parameter-std-insert-int`); its position
+  is then drawn uniformly across the exact range that keeps it spanning the
+  junction. A fragment is only kept if the junction actually lands inside
+  the sequenced portion of the head or tail read (not merely somewhere in
+  the fragment) — a pair whose two reads never touch the junction wouldn't
+  show any fusion evidence once aligned, so it's discarded and redrawn.
+- The number of fusion read pairs produced is `round(depth × rate)`, where
+  `depth` is the real pileup depth of `--input-bam` at the primary
+  breakpoint position (counting only primary, mapped, non-duplicate,
+  QC-pass alignments — matching `samtools depth`'s default filter) and
   `rate` is `--parameter-rate-float` (0.0-0.5).
 - `nb_reads` in an `--input-reference-fasta` spec is ignored by this
   command — the read count comes from depth × rate instead; `id_diversity`
