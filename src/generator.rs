@@ -4,7 +4,7 @@
 use std::error::Error;
 
 use crate::diversity::ProfileDiversity;
-use crate::fastq::FastqRecord;
+use crate::fastq::build_read_pair;
 use crate::io::FastqWriter;
 use crate::profile_sequencer::ProfileSequencer;
 use crate::reference::Reference;
@@ -77,67 +77,39 @@ impl Generator {
                 self.config.mean_insert_size,
                 self.config.std_insert_size,
             )?;
-            let Some((chrom, location_start, location_stop, mut sequence)) = fragment else {
+            let Some((chrom, location_start, location_stop, sequence)) = fragment else {
                 skipped += 1;
                 log::warn!("read {i}: no valid fragment found after {MAX_FRAGMENT_ATTEMPTS} attempts, skipping");
                 continue;
             };
 
             let reference = &self.references[ref_idx];
-            if let (Some(profile), Some(id)) =
-                (&self.config.profile_diversity, &reference.id_diversity)
-            {
-                let diversity = profile
-                    .get(id)
-                    .expect("diversity ids are validated in Generator::new");
-                sequence.make_mutation(&mut rng, diversity);
-            }
+            let diversity = match (&self.config.profile_diversity, &reference.id_diversity) {
+                (Some(profile), Some(id)) => {
+                    Some(profile.get(id).expect("diversity ids are validated in Generator::new"))
+                }
+                _ => None,
+            };
             let ref_name = reference.name();
 
             // `head` always starts at `location_start` reading forward (no
             // reverse-complement); `tail` always ends at `location_stop`
             // reading backward (reverse-complemented). Which one lands in
             // the forward-strand output file vs the reverse one is
-            // randomized below, but content and coordinates always stay
-            // paired correctly by construction.
-            let head_seq = sequence.sub_read(self.config.length_reads, true, false);
-            let tail_seq = sequence.sub_read(self.config.length_reads, false, true);
-            let head_len = head_seq.len() as u64;
-            let tail_len = tail_seq.len() as u64;
-
-            let mut head = FastqRecord::new(
-                head_seq,
-                33,
+            // randomized inside `build_read_pair`, but content and
+            // coordinates always stay paired correctly by construction.
+            let (r1, r2) = build_read_pair(
+                sequence,
+                &mut rng,
+                diversity,
+                self.config.length_reads,
+                self.config.profile_sequencer.as_ref(),
                 i,
-                true,
-                ref_name.clone(),
-                chrom.clone(),
-                location_start,
-                location_start + head_len,
-            );
-            let mut tail = FastqRecord::new(
-                tail_seq,
-                33,
-                i,
-                false,
                 ref_name,
                 chrom,
-                location_stop.saturating_sub(tail_len),
+                location_start,
                 location_stop,
             );
-
-            head.init_qual(&mut rng);
-            tail.init_qual(&mut rng);
-            if let Some(profile_sequencer) = &self.config.profile_sequencer {
-                head.make_errors(&mut rng, profile_sequencer);
-                tail.make_errors(&mut rng, profile_sequencer);
-            }
-
-            let (r1, r2) = if rng.unit() >= 0.5 {
-                (head, tail)
-            } else {
-                (tail, head)
-            };
             writer1.write_record(&r1)?;
             writer2.write_record(&r2)?;
 

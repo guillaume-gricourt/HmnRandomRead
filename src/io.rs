@@ -172,6 +172,16 @@ impl FastqWriter {
         write!(self.encoder, "{record}")
     }
 
+    /// Write a record read verbatim via [`FastqReader`], for passing real
+    /// FASTQ input straight through to an output file.
+    pub fn write_raw(&mut self, raw: &FastqRawRecord) -> io::Result<()> {
+        writeln!(self.encoder, "@{}", raw.header)?;
+        writeln!(self.encoder, "{}", raw.sequence)?;
+        writeln!(self.encoder, "+")?;
+        self.encoder.write_all(&raw.quality)?;
+        writeln!(self.encoder)
+    }
+
     pub fn finish(self) -> io::Result<()> {
         self.encoder.finish()?;
         Ok(())

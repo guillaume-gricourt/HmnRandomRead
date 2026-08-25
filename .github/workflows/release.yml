@@ -6,18 +6,17 @@ on:
       - stable
 
 jobs:
-
   TagRaw:
     runs-on: ubuntu-latest
     outputs:
-     tag: ${{ steps.tag_label.outputs.tag }}
-     changelog: ${{ steps.tag_raw.outputs.changelog }}
+      tag: ${{ steps.tag_label.outputs.tag }}
+      changelog: ${{ steps.tag_raw.outputs.changelog }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
           fetch-depth: 0
-      - name: 'Bump version and push tag - dry run'
+      - name: "Bump version and push tag - dry run"
         id: tag_raw
         uses: mathieudutour/github-tag-action@v6.2
         with:
@@ -25,7 +24,7 @@ jobs:
           release_branches: stable
           tag_prefix:
           dry_run: true
-      - name: 'Format tag'
+      - name: "Format tag"
         id: tag_label
         env:
           TAG: ${{ steps.tag_raw.outputs.new_tag }}
@@ -40,14 +39,14 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - name: 'Check file present'
+      - name: "Check file present"
         run: |
           [[ -f CHANGELOG.md ]] || touch CHANGELOG.md
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3 # Not needed with a .ruby-version file
           bundler-cache: true # runs 'bundle install' and caches installed gems automatically
-      - name: 'Generate CHANGELOG'
+      - name: "Generate CHANGELOG"
         env:
           CHANGELOG_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -73,7 +72,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: stable
-      - name: 'Update Cargo.toml version'
+      - name: "Update Cargo.toml version"
         id: update_version
         env:
           TAG: ${{ needs.TagRaw.outputs.tag }}
@@ -90,8 +89,32 @@ jobs:
           path: ${{ steps.update_version.outputs.version_path }}
           retention-days: 1
 
+  ThirdParty:
+    needs: Version
+    runs-on: ubuntu-latest
+    outputs:
+      thirdparty_path: ${{ steps.third_party.outputs.thirdparty_path }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: stable
+      - name: "Install cargo-bundle-licenses"
+        run: cargo install cargo-bundle-licenses
+      - name: "Update Thirdparty"
+        id: third_party
+        run: |
+          THIRDPARTY_PATH=THIRDPARTY.yaml
+          cargo bundle-licenses --format yaml --output "$THIRDPARTY_PATH"
+          echo "thirdparty_path=$THIRDPARTY_PATH" >> "$GITHUB_OUTPUT"
+      - name: "Upload Artifact ThirdParty"
+        uses: actions/upload-artifact@v4
+        with:
+          name: third-party-artifact
+          path: ${{ steps.third_party.outputs.thirdparty_path }}
+          retention-days: 1
+
   Commit:
-    needs: [Changelog, Version]
+    needs: [Changelog, Version, ThirdParty]
     runs-on: ubuntu-latest
     steps:
       # Get Data
@@ -109,8 +132,12 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: changelog-artifact
+      - name: "Download Artifact ThirdParty"
+        uses: actions/download-artifact@v4
+        with:
+          name: third-party-artifact
       # Commit
-      - name: 'Commit files'
+      - name: "Commit files"
         run: |
           git config --local user.email "$GITHUB_EMAIL"
           git config --local user.name "$GITHUB_USERNAME"
@@ -119,12 +146,12 @@ jobs:
         env:
           GITHUB_USERNAME: guillaume-gricourt
           GITHUB_EMAIL: guipagui@gmail.com
-      - name: 'Push changes'
+      - name: "Push changes"
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           branch: ${{ github.ref }}
-      - name: 'Update main branch'
+      - name: "Update main branch"
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -138,7 +165,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - name: 'Bump version and push tag'
+      - name: "Bump version and push tag"
         id: tag
         uses: mathieudutour/github-tag-action@v6.2
         with:
