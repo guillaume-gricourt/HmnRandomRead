@@ -95,7 +95,7 @@ jobs:
     outputs:
       thirdparty_path: ${{ steps.third_party.outputs.thirdparty_path }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: stable
       - name: "Install cargo-bundle-licenses"
