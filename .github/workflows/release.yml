@@ -107,7 +107,7 @@ jobs:
           cargo bundle-licenses --format yaml --output "$THIRDPARTY_PATH"
           echo "thirdparty_path=$THIRDPARTY_PATH" >> "$GITHUB_OUTPUT"
       - name: "Upload Artifact ThirdParty"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: third-party-artifact
           path: ${{ steps.third_party.outputs.thirdparty_path }}
