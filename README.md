@@ -73,6 +73,7 @@ HmnRandomRead fusion-in-sample \
     --parameter-length-reads-int <int, optional, 150> \
     --parameter-mean-insert-int <int, optional, 500> \
     --parameter-std-insert-int <int, optional, 50> \
+    --parameter-minimum-anchor-int <int, optional, 20> \
 
     --input-profile-diversity-csv <string, optional> \
     --input-profile-sequencer-csv <string, optional> \
@@ -87,6 +88,9 @@ HmnRandomRead version
 Use one or more FASTA file used as reference sequence (`--input-reference-fasta`, may be
 repeated: `path[,nb_reads[,id_diversity]]`).
 Indicate also the number of sequence to generate for each reference.
+`nb_reads` may be left empty (`path,`, `path,,id_diversity`) and then defaults
+to 0 — handy to give an `id_diversity` to a command computing the read count
+itself, such as `fusion-in-sample`.
 
 ### Output
 
@@ -233,10 +237,16 @@ HmnRandomRead fusion-in-sample \
 - Fragment length is drawn from the same insert-size gaussian as `simulate`
   (`--parameter-mean-insert-int`/`--parameter-std-insert-int`); its position
   is then drawn uniformly across the exact range that keeps it spanning the
-  junction. A fragment is only kept if the junction actually lands inside
-  the sequenced portion of the head or tail read (not merely somewhere in
-  the fragment) — a pair whose two reads never touch the junction wouldn't
-  show any fusion evidence once aligned, so it's discarded and redrawn.
+  junction. A fragment is only kept if the junction lands inside the
+  sequenced portion of the head or tail read with at least
+  `--parameter-minimum-anchor-int` (default 20) bases on each side of it
+  within that read — a pair whose two reads never touch the junction, or
+  only by a couple of bases, wouldn't be callable as chimeric by a real
+  aligner (short-read aligners need a minimum seed length to place a
+  supplementary alignment — e.g. BWA-MEM's default is 19bp — and SV/fusion
+  callers add their own minimum overhang requirement on top, typically
+  20-25bp) and so would carry no usable fusion evidence once aligned;
+  fragments that don't satisfy this are discarded and redrawn.
 - The number of fusion read pairs produced is `round(depth × rate)`, where
   `depth` is the real pileup depth of `--input-bam` at the primary
   breakpoint position (counting only primary, mapped, non-duplicate,
@@ -245,7 +255,8 @@ HmnRandomRead fusion-in-sample \
 - `nb_reads` in an `--input-reference-fasta` spec is ignored by this
   command — the read count comes from depth × rate instead; `id_diversity`
   is still applied (from the reference matching the primary breakpoint) if
-  `--input-profile-diversity-csv` is given.
+  `--input-profile-diversity-csv` is given. The field can be left empty, so
+  a diversity id is given as `genome.fa,,human`.
 - Produced reads are tagged `fusion` in their FASTQ header, with the
   breakpoint pair (e.g. `chr9:130854064>chr22:23632600`) in place of a
   chromosome name.

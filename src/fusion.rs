@@ -192,14 +192,26 @@ pub fn depth_at(bam_path: &str, chrom: &str, pos_1based: u64) -> Result<u32, Box
 /// falls in the unsequenced middle of a long fragment would silently
 /// produce a read pair with no trace of the fusion in its actual sequence
 /// (a "supporting" read that isn't represented at the breakpoint at all).
-/// Only fragments where the junction lands inside the head read's window
-/// (`[start, start+length_reads)`) or the tail read's window
-/// (`[stop-length_reads, stop)`) are accepted. Returns `None` if every
-/// attempt failed.
+///
+/// Landing *somewhere* inside a sequenced window isn't enough either: a
+/// junction just 1-2 bases from a read's edge leaves too short a segment on
+/// one side for a real aligner to call it as a chimeric/split alignment
+/// (short-read aligners need a minimum seed length — e.g. BWA-MEM's default
+/// is 19bp — and SV/fusion callers layer their own minimum overhang on top
+/// of that, typically 20-25bp); such a read just aligns wholesale to its
+/// majority partner, silently carrying no usable fusion evidence even
+/// though it was "produced". `min_anchor` requires both the primary-side
+/// and secondary-side segments within whichever read contains the junction
+/// to be at least that long. Only fragments where the junction lands inside
+/// the head read's window (`[start, start+length_reads)`) or the tail
+/// read's window (`[stop-length_reads, stop)`), with at least `min_anchor`
+/// bases on each side of it within that window, are accepted. Returns
+/// `None` if every attempt failed.
 fn pick_fragment_near_junction(
     seq_len: usize,
     junction_index: usize,
     length_reads: usize,
+    min_anchor: usize,
     rng: &mut RandomGenerator,
     mean_insert: f64,
     std_insert: f64,
@@ -220,10 +232,23 @@ fn pick_fragment_near_junction(
         let (start, stop) = (start as usize, stop as usize);
 
         let take = length_reads.min(stop - start);
-        let head_end = start + take;
-        let tail_start = stop - take;
-        let junction_in_head = start <= junction_index && junction_index < head_end;
-        let junction_in_tail = tail_start <= junction_index && junction_index < stop;
+        if take < 2 * min_anchor {
+            // A read this short can never fit min_anchor bases on both
+            // sides of the junction, in either window.
+            continue;
+        }
+
+        // `start <= junction_index < stop` always holds by construction of
+        // `lo`/`hi` above, so these never underflow.
+        let dist_from_start = junction_index - start;
+        let dist_to_stop = stop - junction_index;
+
+        let junction_in_head = dist_from_start < take
+            && dist_from_start >= min_anchor
+            && take - dist_from_start >= min_anchor;
+        let junction_in_tail = dist_to_stop <= take
+            && dist_to_stop >= min_anchor
+            && take - dist_to_stop >= min_anchor;
         if junction_in_head || junction_in_tail {
             return Some((start, stop));
         }
@@ -235,6 +260,7 @@ pub struct FusionConfig {
     pub length_reads: usize,
     pub mean_insert_size: f64,
     pub std_insert_size: f64,
+    pub min_anchor: usize,
     pub profile_diversity: Option<ProfileDiversity>,
     pub id_diversity: Option<String>,
     pub profile_sequencer: Option<ProfileSequencer>,
@@ -279,6 +305,7 @@ impl FusionGenerator {
                 junction.len(),
                 junction_index,
                 self.config.length_reads,
+                self.config.min_anchor,
                 rng,
                 self.config.mean_insert_size,
                 self.config.std_insert_size,
@@ -437,6 +464,7 @@ mod tests {
                 seq_len,
                 junction_index,
                 length_reads,
+                0,
                 &mut rng,
                 300.0,
                 50.0,
@@ -466,8 +494,63 @@ mod tests {
         // start that keeps a 300bp fragment inside a 300bp sequence while
         // spanning position 150 is 0, which strands the junction in the
         // unsequenced middle every time.
-        let result = pick_fragment_near_junction(300, 150, 50, &mut rng, 300.0, 0.001);
+        let result = pick_fragment_near_junction(300, 150, 50, 0, &mut rng, 300.0, 0.001);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn pick_fragment_respects_minimum_anchor() {
+        // seq_len=400, junction at 200, length_reads=50: fragments are
+        // forced to size_insert~=50 (== length_reads) via a tiny std, so
+        // start is pinned to (junction - size_insert, junction], and the
+        // junction's offset within the sequenced window varies attempt to
+        // attempt only via the uniform draw over that (small) range.
+        // Requiring an anchor >= length_reads/2 leaves essentially no valid
+        // offset, so every attempt must fail.
+        let mut rng = RandomGenerator::new(3);
+        let result = pick_fragment_near_junction(400, 200, 50, 25, &mut rng, 50.0, 0.001);
+        assert!(result.is_none());
+
+        // The same setup with no anchor requirement succeeds instead —
+        // confirms the failure above is specifically the anchor
+        // requirement, not some other bound.
+        let mut rng = RandomGenerator::new(3);
+        let result = pick_fragment_near_junction(400, 200, 50, 0, &mut rng, 50.0, 0.001);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn pick_fragment_with_anchor_always_has_enough_bases_on_both_sides() {
+        let mut rng = RandomGenerator::new(11);
+        let seq_len = 800;
+        let junction_index = 400;
+        let length_reads = 100;
+        let min_anchor = 20;
+        let mut found_any = false;
+        for _ in 0..500 {
+            if let Some((start, stop)) = pick_fragment_near_junction(
+                seq_len,
+                junction_index,
+                length_reads,
+                min_anchor,
+                &mut rng,
+                300.0,
+                50.0,
+            ) {
+                found_any = true;
+                let take = length_reads.min(stop - start);
+                let dist_from_start = junction_index - start;
+                let dist_to_stop = stop - junction_index;
+                let head_ok = dist_from_start < take
+                    && dist_from_start >= min_anchor
+                    && take - dist_from_start >= min_anchor;
+                let tail_ok = dist_to_stop <= take
+                    && dist_to_stop >= min_anchor
+                    && take - dist_to_stop >= min_anchor;
+                assert!(head_ok || tail_ok, "insufficient anchor for [{start},{stop})");
+            }
+        }
+        assert!(found_any);
     }
 
     #[test]
@@ -483,6 +566,7 @@ mod tests {
             length_reads: 50,
             mean_insert_size: 150.0,
             std_insert_size: 20.0,
+            min_anchor: 20,
             profile_diversity: None,
             id_diversity: None,
             profile_sequencer: None,

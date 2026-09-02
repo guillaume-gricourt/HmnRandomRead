@@ -29,7 +29,8 @@ enum Commands {
     /// Simulate paired-end FASTQ reads from one or more reference genomes.
     Simulate {
         /// Reference path with an optional read count and diversity id:
-        /// `path[,nb_reads[,id_diversity]]`. May be repeated.
+        /// `path[,nb_reads[,id_diversity]]`. May be repeated. `nb_reads` may
+        /// be left empty (`path,,id_diversity`) and then defaults to 0.
         #[arg(long, action = clap::ArgAction::Append)]
         input_reference_fasta: Vec<String>,
 
@@ -121,7 +122,8 @@ enum Commands {
         /// `path[,nb_reads[,id_diversity]]`. May be repeated. `nb_reads` is
         /// ignored — the number of fusion reads produced is derived from
         /// the real depth at --parameter-breakpoint-primary-roi times
-        /// --parameter-rate-float instead.
+        /// --parameter-rate-float instead — and may be left empty
+        /// (`path,,id_diversity`).
         #[arg(long, action = clap::ArgAction::Append)]
         input_reference_fasta: Vec<String>,
 
@@ -198,6 +200,16 @@ enum Commands {
         /// Standard deviation of the fragment insert size.
         #[arg(long, default_value_t = 50)]
         parameter_std_insert_int: u32,
+
+        /// Minimum number of bases required on each side of the breakpoint
+        /// within whichever read (head or tail) carries the junction. Below
+        /// this, a real aligner typically can't confidently call the read
+        /// as chimeric (short-read aligners need a minimum seed length —
+        /// e.g. BWA-MEM's default is 19bp — and SV/fusion callers add their
+        /// own minimum overhang on top), so the read would carry no usable
+        /// fusion evidence even though it was produced.
+        #[arg(long, default_value_t = 20)]
+        parameter_minimum_anchor_int: usize,
 
         /// Identifier to select within --input-profile-sequencer-csv. Required
         /// if --input-profile-sequencer-csv is set.
@@ -543,6 +555,7 @@ fn cmd_fusion_in_sample(command: &Commands) -> i32 {
         parameter_length_reads_int,
         parameter_mean_insert_int,
         parameter_std_insert_int,
+        parameter_minimum_anchor_int,
         parameter_profile_sequencer_id_str,
         parameter_seed_int,
     } = command
@@ -566,6 +579,14 @@ fn cmd_fusion_in_sample(command: &Commands) -> i32 {
         log::error!(
             "--parameter-reciprocal-rate-float must be within [0.0, 1.0], got \
              {parameter_reciprocal_rate_float}"
+        );
+        return 1;
+    }
+    if *parameter_length_reads_int < 2 * parameter_minimum_anchor_int {
+        log::error!(
+            "--parameter-length-reads-int ({parameter_length_reads_int}) must be at least twice \
+             --parameter-minimum-anchor-int ({parameter_minimum_anchor_int}), otherwise no read \
+             can ever fit the required anchor on both sides of the junction"
         );
         return 1;
     }
@@ -700,6 +721,7 @@ fn cmd_fusion_in_sample(command: &Commands) -> i32 {
         length_reads: *parameter_length_reads_int,
         mean_insert_size: *parameter_mean_insert_int as f64,
         std_insert_size: *parameter_std_insert_int as f64,
+        min_anchor: *parameter_minimum_anchor_int,
         profile_diversity,
         id_diversity: ref_primary.id_diversity.clone(),
         profile_sequencer,
@@ -1021,6 +1043,7 @@ mod tests {
             parameter_rate_float,
             parameter_reciprocal_rate_float,
             parameter_length_reads_int,
+            parameter_minimum_anchor_int,
             ..
         } = &cli.command
         else {
@@ -1033,6 +1056,38 @@ mod tests {
         assert_eq!(*parameter_rate_float, 0.1);
         assert_eq!(*parameter_reciprocal_rate_float, 0.5);
         assert_eq!(*parameter_length_reads_int, 150);
+        assert_eq!(*parameter_minimum_anchor_int, 20);
+    }
+
+    #[test]
+    fn fusion_in_sample_rejects_length_reads_too_short_for_minimum_anchor() {
+        let cli = Cli::parse_from([
+            APP_NAME,
+            "fusion-in-sample",
+            "--input-reference-fasta",
+            "genome.fa",
+            "--input-forward-fastq",
+            "sample_r1.fastq.gz",
+            "--input-reverse-fastq",
+            "sample_r2.fastq.gz",
+            "--input-bam",
+            "sample.bam",
+            "--parameter-breakpoint-primary-roi",
+            "chr9:130854064",
+            "--parameter-breakpoint-secondary-roi",
+            "chr22:23632600",
+            "--parameter-rate-float",
+            "0.1",
+            "--parameter-length-reads-int",
+            "30",
+            "--parameter-minimum-anchor-int",
+            "20",
+            "--output-forward-fastq",
+            "out_r1.fastq.gz",
+            "--output-reverse-fastq",
+            "out_r2.fastq.gz",
+        ]);
+        assert_eq!(cmd_fusion_in_sample(&cli.command), 1);
     }
 
     #[test]
