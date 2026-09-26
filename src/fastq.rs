@@ -20,6 +20,11 @@ pub struct FastqRecord {
     pub chromosome: String,
     pub start: u64,
     pub end: u64,
+    /// When set, used verbatim as the whole FASTQ header instead of the
+    /// default `number/mate reference_chromosome_start_end` form. See
+    /// [`crate::fusion::build_qname`] for why the fusion path needs its
+    /// metadata inside the name rather than in the header's comment.
+    pub qname: Option<String>,
 }
 
 impl FastqRecord {
@@ -45,6 +50,7 @@ impl FastqRecord {
             chromosome,
             start,
             end,
+            qname: None,
         }
     }
 
@@ -59,6 +65,9 @@ impl FastqRecord {
     }
 
     fn name(&self) -> String {
+        if let Some(qname) = &self.qname {
+            return qname.clone();
+        }
         format!(
             "{}/{} {}_{}_{}_{}",
             self.number,
@@ -99,7 +108,7 @@ impl FastqRecord {
 /// mutation (if any), split it into a head/tail read of `length_reads`
 /// bases, draw baseline quality, apply sequencer error (if any), then
 /// randomize which mate lands in the forward/reverse output. Shared by
-/// `simulate`'s `Generator` and `fusion-in-sample`'s `FusionGenerator` — the
+/// `simulate`'s `Generator` and `fusion-simulate`'s `FusionGenerator` — the
 /// only difference between the two is how `sequence`/`location_*` are
 /// picked upstream.
 #[allow(clippy::too_many_arguments)]
