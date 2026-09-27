@@ -16,12 +16,24 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      # A version set by hand in Cargo.toml and not released yet wins over
+      # the one derived from the conventional commits.
+      - name: "Take the version from Cargo.toml if not tagged yet"
+        id: cargo_version
+        run: |
+          VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
+          if git rev-parse -q --verify "refs/tags/$VERSION" > /dev/null; then
+            echo "custom_tag=" >> "$GITHUB_OUTPUT"
+          else
+            echo "custom_tag=$VERSION" >> "$GITHUB_OUTPUT"
+          fi
       - name: "Bump version and push tag - dry run"
         id: tag_raw
         uses: mathieudutour/github-tag-action@v6.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           release_branches: stable
+          custom_tag: ${{ steps.cargo_version.outputs.custom_tag }}
           tag_prefix:
           dry_run: true
       - name: "Format tag"
@@ -183,3 +195,44 @@ jobs:
         with:
           tag_name: ${{ needs.TagRaw.outputs.tag }}
           body: ${{ needs.TagRaw.outputs.changelog }}
+
+  Build:
+    needs: [TagRaw, Release]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: macos-latest
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: stable
+          persist-credentials: false
+      - name: "Build"
+        run: cargo build --release --target ${{ matrix.target }}
+      - name: "Package"
+        id: package
+        env:
+          TAG: ${{ needs.TagRaw.outputs.tag }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          NAME="HmnRandomRead-$TAG-$TARGET"
+          mkdir "$NAME"
+          cp "target/$TARGET/release/HmnRandomRead" LICENSE README.md "$NAME/"
+          "$NAME/HmnRandomRead" version
+          if [ "$RUNNER_OS" = "Linux" ]; then ldd "$NAME/HmnRandomRead"; else otool -L "$NAME/HmnRandomRead"; fi
+          tar -czf "$NAME.tar.gz" "$NAME"
+          echo "archive=$NAME.tar.gz" >> "$GITHUB_OUTPUT"
+      - name: "Upload to the release"
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.TagRaw.outputs.tag }}
+          files: ${{ steps.package.outputs.archive }}

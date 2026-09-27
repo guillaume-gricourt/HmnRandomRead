@@ -20,6 +20,20 @@
 conda install -c bioconda hmnrandomread
 ```
 
+### Download a binary
+
+Each [GitHub release](https://github.com/guillaume-gricourt/HmnRandomRead/releases)
+ships a prebuilt binary for Linux x86_64 (glibc ≥ 2.35, OpenSSL 3), macOS
+x86_64 and macOS arm64 (macOS ≥ 11):
+
+```sh
+VERSION=0.12.0
+TARGET=x86_64-unknown-linux-gnu  # or x86_64-apple-darwin, aarch64-apple-darwin
+curl -L -O "https://github.com/guillaume-gricourt/HmnRandomRead/releases/download/$VERSION/HmnRandomRead-$VERSION-$TARGET.tar.gz"
+tar -xzf "HmnRandomRead-$VERSION-$TARGET.tar.gz"
+"HmnRandomRead-$VERSION-$TARGET/HmnRandomRead" version
+```
+
 ### Build from source
 
 ```sh
