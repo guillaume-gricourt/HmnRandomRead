@@ -56,13 +56,16 @@ impl Strand {
 
 /// A fusion partner's breakpoint: 1-based `pos` is the last reference base
 /// before the break, which always falls between `pos` and `pos + 1` on the
-/// reference, whatever the strand. `strand` is the strand the partner is
-/// taken on (drawn per read pair by `fusion-simulate`):
+/// reference, whatever the strand. `strand` is the strand of the partner's
+/// gene (the optional suffix of a `chrom:pos[:+|-]` spec):
 /// a `+` gene keeps the bases up to `pos` as its 5' part and from `pos + 1`
 /// on as its 3' part; a `-` gene the reverse complement of the bases from
 /// `pos + 1` on as its 5' part and of the bases up to `pos` as its 3' part.
-/// Two `+` partners (or two `-`) give a translocation; one of each, an
-/// inversion-type junction such as EML4-ALK.
+/// Partners on the same strand (BCR::ABL1, `+`/`+`; TMPRSS2::ERG, `-`/`-`)
+/// or on opposite strands (ETV6::RUNX1 and EML4::ALK, `+`/`-`;
+/// TCF3::PBX1, `-`/`+`) are all real fusions — translocations or
+/// intrachromosomal rearrangements alike; the strands only say which side of
+/// each break, and in which orientation, the fused transcript is read from.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Breakpoint {
     pub chrom: String,
@@ -86,6 +89,21 @@ impl Breakpoint {
             return Err(parse_err(format!("malformed breakpoint '{spec}', pos must be >= 1")));
         }
         Ok(Breakpoint { chrom: chrom.to_string(), pos, strand: Strand::Forward })
+    }
+
+    /// Parse a `chrom:pos[:+|-]` spec: a [`Breakpoint::parse`] spec with an
+    /// optional strand suffix, `+` when left out.
+    pub fn parse_stranded(spec: &str) -> Result<Self, Box<dyn Error>> {
+        match spec.rsplit_once(':') {
+            Some((position, strand @ ("+" | "-"))) => {
+                let strand = Strand::parse(strand)?;
+                let bp = Breakpoint::parse(position).map_err(|_| {
+                    parse_err(format!("malformed breakpoint '{spec}', expected 'chrom:pos[:+|-]'"))
+                })?;
+                Ok(Breakpoint { strand, ..bp })
+            }
+            _ => Breakpoint::parse(spec),
+        }
     }
 
     /// `chrom:pos`, as parsed by [`Breakpoint::parse`] (the strand is not
@@ -879,6 +897,30 @@ mod tests {
         let bp = Breakpoint::parse("chr1:100").unwrap();
         assert_eq!(bp.chrom, "chr1");
         assert_eq!(bp.pos, 100);
+    }
+
+    #[test]
+    fn breakpoint_parse_stranded_defaults_to_plus() {
+        let bp = Breakpoint::parse_stranded("chr1:100").unwrap();
+        assert_eq!(bp, Breakpoint::parse("chr1:100").unwrap());
+        assert_eq!(bp.strand, Strand::Forward);
+    }
+
+    #[test]
+    fn breakpoint_parse_stranded_reads_the_strand_suffix() {
+        let bp = Breakpoint::parse_stranded("chr21:34887000:-").unwrap();
+        assert_eq!((bp.chrom.as_str(), bp.pos, bp.strand), ("chr21", 34887000, Strand::Reverse));
+        // The position stays parseable on its own, strand left out.
+        assert_eq!(bp.position(), "chr21:34887000");
+        let bp = Breakpoint::parse_stranded("chr12:11869000:+").unwrap();
+        assert_eq!(bp.strand, Strand::Forward);
+    }
+
+    #[test]
+    fn breakpoint_parse_stranded_rejects_malformed_specs() {
+        for spec in ["chr1:100:x", "chr1:100:", "chr1:+", ":100:-", "chr1:0:+"] {
+            assert!(Breakpoint::parse_stranded(spec).is_err(), "{spec}");
+        }
     }
 
     #[test]

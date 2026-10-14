@@ -76,7 +76,6 @@ HmnRandomRead fusion-simulate \
     --input-reference-fasta <string, required><int, required><string, optional> \
     --parameter-breakpoint-primary-roi <string, required> \
     --parameter-breakpoint-secondary-roi <string, required> \
-    --parameter-forward-strand-rate-float <float, optional, 1.0> \
     --parameter-reciprocal-rate-float <float, optional, 0.5> \
     --output-forward-fastq <string, required> \
     --output-reverse-fastq <string, required> \
@@ -245,16 +244,14 @@ HmnRandomRead fusion-simulate \
 ```
 
 - `--parameter-breakpoint-primary-roi`/`--parameter-breakpoint-secondary-roi`
-  (`chrom:pos`, 1-based) are the two breakpoint partners: the primary one is
-  the 5' partner of the primary→secondary junction, the secondary one its 3'
-  partner. `pos` is the last reference base before the break, which always
-  falls between `pos` and `pos + 1`. If either breakpoint's flank contains
-  an `N` (assembly gap), the command fails with a clear error rather than
-  emitting reads full of `N`.
-- `--parameter-forward-strand-rate-float` (0.0-1.0, default 1.0) is the
-  probability for each partner of a read pair to be taken on the `+` strand
-  rather than the `-` one, drawn independently for the two partners of
-  every pair. The strand decides the side of the break a partner
+  (`chrom:pos[:+|-]`, 1-based) are the two breakpoint partners: the primary
+  one is the 5' partner of the primary→secondary junction, the secondary one
+  its 3' partner. `pos` is the last reference base before the break, which
+  always falls between `pos` and `pos + 1`. The optional `:+`/`:-` suffix is
+  the strand of the partner's gene (see below), `+` when left out. If either breakpoint's flank contains an `N` (assembly
+  gap), the command fails with a clear error rather than emitting reads full
+  of `N`.
+- Each partner is taken on a strand, which decides the side of the break it
   contributes and its orientation:
 
   | strand | as the 5' partner                        | as the 3' partner                        |
@@ -262,16 +259,21 @@ HmnRandomRead fusion-simulate \
   | `+`    | bases up to `pos`                        | bases from `pos + 1` on                  |
   | `-`    | reverse complement of bases from `pos + 1` on | reverse complement of bases up to `pos` |
 
-  Two partners on the same strand give a translocation (e.g. PML-RARA,
-  BCR-ABL1); partners on opposite strands an inversion-type junction (e.g.
-  EML4-ALK). With a rate `r`, the pool mixes the four geometries `+/+`,
-  `+/-`, `-/+` and `-/-` at `r²`, `r(1-r)`, `(1-r)r` and `(1-r)²`; the
-  default 1.0 keeps every pair on `+/+`. Each pair's geometry is in its
-  truth row's junction label (`chrom:pos(strand)>chrom:pos(strand)`) and
-  the rate in `#forward_strand_rate`. A geometry mix splits the support
-  between junctions a caller reports separately, like
-  `--parameter-reciprocal-rate-float` does: keep 1.0 (or 0.0) when
-  quantifying a single junction.
+  A real fusion has a single geometry, set by its two genes' strands:
+  `+/+` for BCR::ABL1, PML::RARA or KMT2A::AFF1, `-/-` for TMPRSS2::ERG,
+  and partners on opposite strands for ETV6::RUNX1 or EML4::ALK (`+/-`) and
+  TCF3::PBX1 (`-/+`) — translocations as well as intrachromosomal
+  rearrangements. Note that `A(-)>B(-)` is the same molecule as
+  `B(+)>A(+)`, and `A(+)>B(-)` the same as `B(+)>A(-)`. Suffix each
+  breakpoint with its gene's strand, e.g.
+  `--parameter-breakpoint-primary-roi chr12:11869000:+
+  --parameter-breakpoint-secondary-roi chr21:34887000:-` for an
+  ETV6::RUNX1-like fusion: every pair is on that geometry. Each partner
+  keeps its own strand in the reciprocal orientation too (the strand is a
+  property of the gene, not of its 5'/3' role), so the reciprocal of that
+  example is `chr21:34887000(-)>chr12:11869000(+)`. Each pair's geometry is
+  in its truth row's junction label (`chrom:pos(strand)>chrom:pos(strand)`),
+  and the strands in `#strand_primary`/`#strand_secondary`.
 - The number of read pairs to produce is the `nb_reads` field of the
   `--input-reference-fasta` spec holding the primary breakpoint — the same
   spec that supplies `id_diversity`. Generate the pool with a wide margin: it
@@ -421,7 +423,9 @@ HmnRandomRead fusion-spike \
   all of one orientation before any of the other. Use a different
   `--parameter-seed-int` per replicate of a dilution series.
 - `--output-truth-tsv` lists the pairs actually injected, under a metadata
-  block recording `#reference_fragments` (and `_secondary`),
+  block recording the pool's `#pool_strand_primary`/`#pool_strand_secondary`
+  (`.` for a pool written before they were recorded),
+  `#reference_fragments` (and `_secondary`),
   `#reference_pileup_reads`, `#target_allelic_fraction`,
   `#realized_allelic_fraction` (and `_secondary`), `#injected_pairs` (split
   into `#injected_primary_secondary_pairs`/`#injected_reciprocal_pairs`),

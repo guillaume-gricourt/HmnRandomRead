@@ -140,31 +140,27 @@ enum Commands {
         #[arg(long)]
         input_profile_sequencer_csv: Option<String>,
 
-        /// Primary breakpoint, as `chrom:pos` (1-based): `pos` is the last
-        /// reference base before the break, which falls between `pos` and
-        /// `pos + 1`. The primary partner is the 5' one of the
-        /// primary->secondary junction.
+        /// Primary breakpoint, as `chrom:pos[:+|-]` (1-based): `pos` is the
+        /// last reference base before the break, which falls between `pos`
+        /// and `pos + 1`. The primary partner is the 5' one of the
+        /// primary->secondary junction. The optional `:+`/`:-` suffix is the
+        /// strand of the partner's gene, `+` when left out; each partner
+        /// keeps it in both junction orientations. On `+`, a 5' partner
+        /// contributes the bases up to the break and a 3' partner the bases
+        /// after it; on `-`, the reverse complement of the bases after the
+        /// break (5') or up to it (3'). Every read pair is on the geometry
+        /// the two strands set: `+`/`+` for BCR::ABL1 or PML::RARA, `-`/`-`
+        /// for TMPRSS2::ERG, opposite strands for ETV6::RUNX1 or EML4::ALK
+        /// (`+`/`-`) and TCF3::PBX1 (`-`/`+`), e.g. `chr12:11869000:+` and
+        /// `chr21:34887000:-` for ETV6::RUNX1.
         #[arg(long)]
         parameter_breakpoint_primary_roi: String,
 
-        /// Secondary breakpoint, as `chrom:pos` (1-based), same convention
-        /// as --parameter-breakpoint-primary-roi. The secondary partner is
-        /// the 3' one of the primary->secondary junction.
+        /// Secondary breakpoint, as `chrom:pos[:+|-]` (1-based), same
+        /// convention as --parameter-breakpoint-primary-roi. The secondary
+        /// partner is the 3' one of the primary->secondary junction.
         #[arg(long)]
         parameter_breakpoint_secondary_roi: String,
-
-        /// Probability for each partner of each read pair to be taken on
-        /// the `+` strand rather than the `-` one, drawn independently for
-        /// the two partners of every pair. Range: 0.0-1.0. On the `+`
-        /// strand, a 5' partner contributes the bases up to the break and a
-        /// 3' partner the bases after it; on the `-` strand, the reverse
-        /// complement of the bases after the break (5') or up to it (3').
-        /// 1.0 (default) keeps both partners on `+` (a translocation such as
-        /// PML-RARA); partners on opposite strands give an inversion-type
-        /// junction (e.g. EML4-ALK), so a rate of `r` mixes the four
-        /// geometries at `r^2`, `r(1-r)`, `(1-r)r` and `(1-r)^2`.
-        #[arg(long, default_value_t = 1.0)]
-        parameter_forward_strand_rate_float: f64,
 
         /// Fraction of the produced fusion read pairs assigned to the
         /// reciprocal junction orientation (secondary partner's 5' part
@@ -645,7 +641,6 @@ fn cmd_fusion_simulate(command: &Commands) -> i32 {
         input_profile_sequencer_csv,
         parameter_breakpoint_primary_roi,
         parameter_breakpoint_secondary_roi,
-        parameter_forward_strand_rate_float,
         parameter_reciprocal_rate_float,
         output_forward_fastq,
         output_reverse_fastq,
@@ -674,13 +669,6 @@ fn cmd_fusion_simulate(command: &Commands) -> i32 {
         );
         return 1;
     }
-    if !(0.0..=1.0).contains(parameter_forward_strand_rate_float) {
-        log::error!(
-            "--parameter-forward-strand-rate-float must be within [0.0, 1.0], got \
-             {parameter_forward_strand_rate_float}"
-        );
-        return 1;
-    }
     if *parameter_length_reads_int < 2 * parameter_minimum_anchor_int {
         log::error!(
             "--parameter-length-reads-int ({parameter_length_reads_int}) must be at least twice \
@@ -691,14 +679,14 @@ fn cmd_fusion_simulate(command: &Commands) -> i32 {
         return 1;
     }
 
-    let primary = match fusion::Breakpoint::parse(parameter_breakpoint_primary_roi) {
+    let primary = match fusion::Breakpoint::parse_stranded(parameter_breakpoint_primary_roi) {
         Ok(bp) => bp,
         Err(e) => {
             log::error!("invalid --parameter-breakpoint-primary-roi: {e}");
             return 1;
         }
     };
-    let secondary = match fusion::Breakpoint::parse(parameter_breakpoint_secondary_roi) {
+    let secondary = match fusion::Breakpoint::parse_stranded(parameter_breakpoint_secondary_roi) {
         Ok(bp) => bp,
         Err(e) => {
             log::error!("invalid --parameter-breakpoint-secondary-roi: {e}");
@@ -804,56 +792,39 @@ fn cmd_fusion_simulate(command: &Commands) -> i32 {
         ((&primary, ref_primary), (&secondary, ref_secondary), n_a),
         ((&secondary, ref_secondary), (&primary, ref_primary), n_b),
     ];
-    for ((five_bp, five_ref), (three_bp, three_ref), n) in orientations {
-        // Each pair draws the strand of its two partners independently; the
-        // pairs sharing a geometry are then generated from one junction.
-        let mut per_geometry = [0u64; 4];
-        for _ in 0..n {
-            let five_reverse = rng.unit() >= *parameter_forward_strand_rate_float;
-            let three_reverse = rng.unit() >= *parameter_forward_strand_rate_float;
-            per_geometry[2 * five_reverse as usize + three_reverse as usize] += 1;
+    for ((five, five_ref), (three, three_ref), n) in orientations {
+        // Each partner keeps its gene's strand whatever its role: one
+        // junction per orientation.
+        if n == 0 {
+            continue;
         }
-        for (geometry, &count) in per_geometry.iter().enumerate() {
-            if count == 0 {
-                continue;
+        let label = fusion::junction_label(five, three);
+        let junction = fusion::build_junction(
+            &fusion::JunctionPartner { faidx: &five_ref.faidx, bp: five, variants: &[] },
+            &fusion::JunctionPartner { faidx: &three_ref.faidx, bp: three, variants: &[] },
+            flank_len,
+        );
+        let (junction, junction_index) = match junction {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("failed to build the {label} junction sequence: {e}");
+                return 1;
             }
-            let strand = |reverse: bool| {
-                if reverse {
-                    fusion::Strand::Reverse
-                } else {
-                    fusion::Strand::Forward
-                }
-            };
-            let five = fusion::Breakpoint { strand: strand(geometry >= 2), ..five_bp.clone() };
-            let three = fusion::Breakpoint { strand: strand(geometry % 2 == 1), ..three_bp.clone() };
-            let label = fusion::junction_label(&five, &three);
-            let junction = fusion::build_junction(
-                &fusion::JunctionPartner { faidx: &five_ref.faidx, bp: &five, variants: &[] },
-                &fusion::JunctionPartner { faidx: &three_ref.faidx, bp: &three, variants: &[] },
-                flank_len,
-            );
-            let (junction, junction_index) = match junction {
-                Ok(v) => v,
-                Err(e) => {
-                    log::error!("failed to build the {label} junction sequence: {e}");
-                    return 1;
-                }
-            };
-            println!("fusion-simulate: {count} read pair(s) on junction {label}");
-            let (f, r, t) = generator.generate(
-                &junction,
-                junction_index,
-                count,
-                &five,
-                &three,
-                &mut rng,
-                number,
-            );
-            number += count;
-            forward.extend(f);
-            reverse.extend(r);
-            truth.extend(t);
-        }
+        };
+        println!("fusion-simulate: {n} read pair(s) on junction {label}");
+        let (f, r, t) = generator.generate(
+            &junction,
+            junction_index,
+            n,
+            five,
+            three,
+            &mut rng,
+            number,
+        );
+        number += n;
+        forward.extend(f);
+        reverse.extend(r);
+        truth.extend(t);
     }
 
     let produced = forward.len() as u64;
@@ -880,7 +851,8 @@ fn cmd_fusion_simulate(command: &Commands) -> i32 {
         ("command", "fusion-simulate".to_string()),
         ("breakpoint_primary", primary.position()),
         ("breakpoint_secondary", secondary.position()),
-        ("forward_strand_rate", parameter_forward_strand_rate_float.to_string()),
+        ("strand_primary", primary.strand.symbol().to_string()),
+        ("strand_secondary", secondary.strand.symbol().to_string()),
         ("reciprocal_rate", parameter_reciprocal_rate_float.to_string()),
         ("length_reads", parameter_length_reads_int.to_string()),
         ("mean_insert_size", parameter_mean_insert_int.to_string()),
@@ -959,6 +931,10 @@ fn cmd_fusion_spike(command: &Commands) -> i32 {
         }
     };
     let (primary, secondary) = (&pool.primary, &pool.secondary);
+    println!(
+        "fusion-spike: pool strands {} (primary), {} (secondary)",
+        pool.strand_primary, pool.strand_secondary
+    );
 
     // Reference *fragments*, not pileup reads: one template molecule crossing
     // the breakpoint is one reference allele however many of its mates
@@ -1033,7 +1009,7 @@ fn cmd_fusion_spike(command: &Commands) -> i32 {
         return 1;
     }
 
-    // Whatever the strands drawn for its partners, a primary->secondary pair
+    // Whatever its partners' strands, a primary->secondary pair
     // has the primary breakpoint as its 5' partner.
     let injected_forward = selected
         .iter()
@@ -1182,6 +1158,8 @@ fn cmd_fusion_spike(command: &Commands) -> i32 {
         ("command", "fusion-spike".to_string()),
         ("breakpoint_primary", primary.position()),
         ("breakpoint_secondary", secondary.position()),
+        ("pool_strand_primary", pool.strand_primary.clone()),
+        ("pool_strand_secondary", pool.strand_secondary.clone()),
         ("reference_fragments", fragments.to_string()),
         ("reference_fragments_secondary", fragments_secondary.to_string()),
         ("reference_pileup_reads", reads.to_string()),
@@ -1241,6 +1219,11 @@ struct PoolMetadata {
     secondary: fusion::Breakpoint,
     reciprocal_rate: f64,
     flank_length: u64,
+    /// `#strand_primary`/`#strand_secondary` (`+` or `-`), `.` for a pool
+    /// written before they were recorded (whose strands may be mixed). Informational only:
+    /// each row's junction label carries the strands it was built on.
+    strand_primary: String,
+    strand_secondary: String,
 }
 
 /// The breakpoints and reciprocal rate a pool's truth TSV was generated
@@ -1251,7 +1234,15 @@ fn read_pool_metadata(truth_path: &str) -> Result<PoolMetadata, Box<dyn Error>> 
     let secondary = fusion::Breakpoint::parse(reader.require("breakpoint_secondary")?)?;
     let reciprocal_rate: f64 = reader.require("reciprocal_rate")?.parse()?;
     let flank_length: u64 = reader.require("flank_length")?.parse()?;
-    Ok(PoolMetadata { primary, secondary, reciprocal_rate, flank_length })
+    let strand = |key| reader.get(key).unwrap_or(".").to_string();
+    Ok(PoolMetadata {
+        primary,
+        secondary,
+        reciprocal_rate,
+        flank_length,
+        strand_primary: strand("strand_primary"),
+        strand_secondary: strand("strand_secondary"),
+    })
 }
 
 /// Extra bases beyond the pool's flanks that `fusion-spike` rebuilds each
@@ -1991,7 +1982,10 @@ mod tests {
             "realized_allelic_fraction",
             "haplotype_variants_primary",
             "haplotype_rewritten_pairs",
-            "forward_strand_rate",
+            "strand_primary",
+            "strand_secondary",
+            "pool_strand_primary",
+            "pool_strand_secondary",
         ]
         .iter()
             .filter_map(|k| reader.get(k).map(|v| (k.to_string(), v.to_string())))
@@ -2011,6 +2005,20 @@ mod tests {
 
     /// [`run_fusion_simulate`], with `extra` flags appended.
     fn run_fusion_simulate_with(dir: &Path, pairs: u64, extra: &[&str]) -> (String, String, String) {
+        let mut args = vec!["--parameter-reciprocal-rate-float", "0.0"];
+        args.extend_from_slice(extra);
+        run_fusion_simulate_at(dir, pairs, "chr1:300", "chr1:900", &args)
+    }
+
+    /// [`run_fusion_simulate_with`], on the given breakpoint specs and with
+    /// the default reciprocal rate unless `extra` sets one.
+    fn run_fusion_simulate_at(
+        dir: &Path,
+        pairs: u64,
+        primary: &str,
+        secondary: &str,
+        extra: &[&str],
+    ) -> (String, String, String) {
         let reference = write_reference(dir, "chr1", 2000);
         let r1 = dir.join("pool_R1.fastq.gz").to_str().unwrap().to_string();
         let r2 = dir.join("pool_R2.fastq.gz").to_str().unwrap().to_string();
@@ -2023,11 +2031,9 @@ mod tests {
             "--input-reference-fasta",
             &pool_spec,
             "--parameter-breakpoint-primary-roi",
-            "chr1:300",
+            primary,
             "--parameter-breakpoint-secondary-roi",
-            "chr1:900",
-            "--parameter-reciprocal-rate-float",
-            "0.0",
+            secondary,
             "--output-forward-fastq",
             &r1,
             "--output-reverse-fastq",
@@ -2072,7 +2078,6 @@ mod tests {
         let Commands::FusionSimulate {
             input_reference_fasta,
             parameter_breakpoint_primary_roi,
-            parameter_forward_strand_rate_float,
             parameter_reciprocal_rate_float,
             output_truth_tsv,
             parameter_length_reads_int,
@@ -2084,7 +2089,6 @@ mod tests {
         };
         assert_eq!(input_reference_fasta, &vec!["genome.fa,1000,human".to_string()]);
         assert_eq!(parameter_breakpoint_primary_roi, "chr9:130854064");
-        assert_eq!(*parameter_forward_strand_rate_float, 1.0);
         assert_eq!(*parameter_reciprocal_rate_float, 0.5);
         assert_eq!(output_truth_tsv, "pool.tsv");
         assert_eq!(*parameter_length_reads_int, 150);
@@ -2205,64 +2209,72 @@ mod tests {
     }
 
     #[test]
-    fn fusion_simulate_mixes_strands_at_the_requested_rate() {
+    fn fusion_simulate_takes_both_partners_on_the_minus_strand() {
+        // TMPRSS2::ERG-like.
         let dir = tempfile::tempdir().unwrap();
-        let (r1, _, tsv) = run_fusion_simulate_with(
-            dir.path(),
-            400,
-            &["--parameter-forward-strand-rate-float", "0.5"],
-        );
-        let (_, rows) = truth_rows(&tsv);
-        assert_eq!(rows.len(), 400);
-        // Four geometries at ~25% each.
-        for label in [
-            "chr1:300(+)>chr1:900(+)",
-            "chr1:300(+)>chr1:900(-)",
-            "chr1:300(-)>chr1:900(+)",
-            "chr1:300(-)>chr1:900(-)",
-        ] {
-            let n = rows.iter().filter(|r| r.junction == label).count();
-            assert!((60..=140).contains(&n), "{label}: {n}");
-        }
-        // Numbered once across geometries: every QNAME is unique.
-        let names: HashSet<String> = fastq_headers(&r1).into_iter().collect();
-        assert_eq!(names.len(), 400);
-    }
-
-    #[test]
-    fn fusion_simulate_takes_every_partner_on_the_minus_strand_at_rate_zero() {
-        let dir = tempfile::tempdir().unwrap();
-        let (_, _, tsv) = run_fusion_simulate_with(
-            dir.path(),
-            20,
-            &["--parameter-forward-strand-rate-float", "0.0"],
-        );
+        let (_, _, tsv) = run_fusion_simulate_at(dir.path(), 20, "chr1:300:-", "chr1:900:-", &[
+            "--parameter-reciprocal-rate-float",
+            "0.0",
+        ]);
         let (metadata, rows) = truth_rows(&tsv);
-        assert!(metadata.contains(&("forward_strand_rate".to_string(), "0".to_string())));
+        assert!(metadata.contains(&("strand_primary".to_string(), "-".to_string())));
         assert!(rows.iter().all(|r| r.junction == "chr1:300(-)>chr1:900(-)"));
     }
 
     #[test]
-    fn fusion_simulate_rejects_a_strand_rate_out_of_range() {
-        let cli = Cli::parse_from([
-            APP_NAME,
-            "fusion-simulate",
-            "--input-reference-fasta",
-            "genome.fa,10",
-            "--parameter-breakpoint-primary-roi",
-            "chr9:130854064",
-            "--parameter-breakpoint-secondary-roi",
-            "chr22:23632600",
-            "--parameter-forward-strand-rate-float",
-            "1.5",
-            "--output-forward-fastq",
-            "out_r1.fastq.gz",
-            "--output-reverse-fastq",
-            "out_r2.fastq.gz",
-            "--output-truth-tsv",
-            "out.tsv",
+    fn fusion_simulate_takes_a_partner_without_a_strand_on_plus() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_, _, tsv) = run_fusion_simulate_at(dir.path(), 20, "chr1:300", "chr1:900:-", &[
+            "--parameter-reciprocal-rate-float",
+            "0.0",
         ]);
-        assert_eq!(cmd_fusion_simulate(&cli.command), 1);
+        let (_, rows) = truth_rows(&tsv);
+        assert!(rows.iter().all(|r| r.junction == "chr1:300(+)>chr1:900(-)"));
+    }
+
+    #[test]
+    fn fusion_simulate_keeps_fixed_opposite_strands_on_every_pair() {
+        // ETV6::RUNX1-like: 5' partner on `+`, 3' partner on `-`.
+        let dir = tempfile::tempdir().unwrap();
+        let (_, _, tsv) =
+            run_fusion_simulate_at(dir.path(), 400, "chr1:300:+", "chr1:900:-", &[
+                "--parameter-reciprocal-rate-float",
+                "0.0",
+            ]);
+        let (metadata, rows) = truth_rows(&tsv);
+        assert_eq!(rows.len(), 400);
+        assert!(rows.iter().all(|r| r.junction == "chr1:300(+)>chr1:900(-)"));
+        let has = |k: &str, v: &str| metadata.contains(&(k.to_string(), v.to_string()));
+        assert!(has("strand_primary", "+"));
+        assert!(has("strand_secondary", "-"));
+    }
+
+    #[test]
+    fn fusion_simulate_keeps_each_partner_on_its_own_strand_in_the_reciprocal() {
+        // TCF3::PBX1-like: the reciprocal swaps the partners' roles, not
+        // their genes' strands.
+        let dir = tempfile::tempdir().unwrap();
+        let (_, _, tsv) = run_fusion_simulate_at(
+            dir.path(),
+            200,
+            "chr1:300:-",
+            "chr1:900:+",
+            &["--parameter-reciprocal-rate-float", "0.5"],
+        );
+        let (_, rows) = truth_rows(&tsv);
+        let count = |label: &str| rows.iter().filter(|r| r.junction == label).count();
+        assert_eq!(count("chr1:300(-)>chr1:900(+)"), 100);
+        assert_eq!(count("chr1:900(+)>chr1:300(-)"), 100);
+    }
+
+    #[test]
+    fn fusion_simulate_records_plus_strands_without_a_strand_suffix() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_, _, tsv) = run_fusion_simulate(dir.path(), 10);
+        let (metadata, _) = truth_rows(&tsv);
+        let has = |k: &str, v: &str| metadata.contains(&(k.to_string(), v.to_string()));
+        assert!(has("strand_primary", "+"));
+        assert!(has("strand_secondary", "+"));
     }
 
     #[test]
@@ -2318,6 +2330,8 @@ mod tests {
         assert!(has("removed_reference_fragments_primary", "4"));
         assert!(has("removed_reference_fragments_secondary", "4"));
         assert!(has("realized_allelic_fraction", "0.200000000"));
+        assert!(has("pool_strand_primary", "+"));
+        assert!(has("pool_strand_secondary", "+"));
         assert_eq!(rows.len(), 4);
         // The BAM's reads (ACGT repeats) disagree with the reference
         // (ACGTTGCAGGTCATCGAT repeats) around chr1:300, where only one mate
@@ -2366,6 +2380,57 @@ mod tests {
         // ...and every injected name is one the truth file claims.
         let claimed: HashSet<&str> = rows.iter().map(|r| r.qname.as_str()).collect();
         assert!(injected.iter().all(|&i| claimed.contains(forward[i].as_str())));
+    }
+
+    #[test]
+    fn fusion_spike_reads_a_pool_written_before_strands_were_recorded() {
+        let dir = tempfile::tempdir().unwrap();
+        let (pool_r1, pool_r2, pool_tsv) = run_fusion_simulate(dir.path(), 40);
+        let old: String = std::fs::read_to_string(&pool_tsv)
+            .unwrap()
+            .lines()
+            .filter(|line| !line.starts_with("#strand_"))
+            .map(|line| format!("{line}\n"))
+            .collect();
+        std::fs::write(&pool_tsv, old).unwrap();
+        let reference = dir.path().join("ref.fa").to_str().unwrap().to_string();
+        let bam = write_indexed_bam(dir.path(), 20);
+        let sample_r1 = write_sample_fastq(dir.path(), "sample_R1.fastq", 20, 60, 1);
+        let sample_r2 = write_sample_fastq(dir.path(), "sample_R2.fastq", 20, 60, 2);
+        let out = |name: &str| dir.path().join(name).to_str().unwrap().to_string();
+        let (out_r1, out_r2, out_tsv) = (out("out_R1.fastq.gz"), out("out_R2.fastq.gz"), out("out.tsv"));
+
+        let cli = Cli::parse_from([
+            APP_NAME,
+            "fusion-spike",
+            "--input-forward-fastq",
+            &sample_r1,
+            "--input-reverse-fastq",
+            &sample_r2,
+            "--input-bam",
+            &bam,
+            "--input-reference-fasta",
+            &reference,
+            "--input-fusion-forward-fastq",
+            &pool_r1,
+            "--input-fusion-reverse-fastq",
+            &pool_r2,
+            "--input-truth-tsv",
+            &pool_tsv,
+            "--parameter-allelic-fraction-float",
+            "0.2",
+            "--output-forward-fastq",
+            &out_r1,
+            "--output-reverse-fastq",
+            &out_r2,
+            "--output-truth-tsv",
+            &out_tsv,
+        ]);
+        assert_eq!(cmd_fusion_spike(&cli.command), 0);
+        let (metadata, rows) = truth_rows(&out_tsv);
+        assert!(metadata.contains(&("pool_strand_primary".to_string(), ".".to_string())));
+        assert!(metadata.contains(&("pool_strand_secondary".to_string(), ".".to_string())));
+        assert_eq!(rows.len(), 4);
     }
 
     #[test]
