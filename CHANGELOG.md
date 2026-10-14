@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.11.0](https://github.com/guillaume-gricourt/HmnRandomRead/tree/0.11.0) (2026-08-23)
+
+[Full Changelog](https://github.com/guillaume-gricourt/HmnRandomRead/compare/0.10.0...0.11.0)
+
+**Merged pull requests:**
+
+- chore\(deps\): bump softprops/action-gh-release from 1 to 2 [\#12](https://github.com/guillaume-gricourt/HmnRandomRead/pull/12) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(deps\): bump mathieudutour/github-tag-action from 6.1 to 6.2 [\#11](https://github.com/guillaume-gricourt/HmnRandomRead/pull/11) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(deps\): bump actions/download-artifact from 3 to 4 [\#10](https://github.com/guillaume-gricourt/HmnRandomRead/pull/10) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(deps\): bump actions/upload-artifact from 3 to 4 [\#9](https://github.com/guillaume-gricourt/HmnRandomRead/pull/9) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(deps\): bump conda-incubator/setup-miniconda from 2 to 3 [\#8](https://github.com/guillaume-gricourt/HmnRandomRead/pull/8) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(deps\): bump actions/checkout from 3 to 4 [\#7](https://github.com/guillaume-gricourt/HmnRandomRead/pull/7) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(deps\): bump github/super-linter from 4 to 5 [\#6](https://github.com/guillaume-gricourt/HmnRandomRead/pull/6) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(deps\): bump actions/checkout from 2 to 3 [\#5](https://github.com/guillaume-gricourt/HmnRandomRead/pull/5) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(deps\): bump actions/download-artifact from 2 to 3 [\#4](https://github.com/guillaume-gricourt/HmnRandomRead/pull/4) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(deps\): bump actions/upload-artifact from 2 to 3 [\#3](https://github.com/guillaume-gricourt/HmnRandomRead/pull/3) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(deps\): bump mathieudutour/github-tag-action from 6.0 to 6.1 [\#2](https://github.com/guillaume-gricourt/HmnRandomRead/pull/2) ([dependabot[bot]](https://github.com/apps/dependabot))
+
 ## [0.10.0](https://github.com/guillaume-gricourt/HmnRandomRead/tree/0.10.0) (2023-01-11)
 
 [Full Changelog](https://github.com/guillaume-gricourt/HmnRandomRead/compare/0.9.1...0.10.0)
