@@ -85,9 +85,11 @@ impl Generator {
 
             let reference = &self.references[ref_idx];
             let diversity = match (&self.config.profile_diversity, &reference.id_diversity) {
-                (Some(profile), Some(id)) => {
-                    Some(profile.get(id).expect("diversity ids are validated in Generator::new"))
-                }
+                (Some(profile), Some(id)) => Some(
+                    profile
+                        .get(id)
+                        .expect("diversity ids are validated in Generator::new"),
+                ),
                 _ => None,
             };
             let ref_name = reference.name();
@@ -150,7 +152,10 @@ fn pick_fragment(
             continue;
         };
 
-        let size_insert = rng.normal(mean_insert_size, std_insert_size).round().max(0.0) as u64;
+        let size_insert = rng
+            .normal(mean_insert_size, std_insert_size)
+            .round()
+            .max(0.0) as u64;
         let (location_start, location_stop) = if size_insert > scaffold.length() {
             (scaffold.start, scaffold.stop)
         } else {
@@ -260,7 +265,10 @@ mod tests {
                 .unwrap()
                 .run(out1.to_str().unwrap(), out2.to_str().unwrap())
                 .unwrap();
-            (read_gz(out1.to_str().unwrap()), read_gz(out2.to_str().unwrap()))
+            (
+                read_gz(out1.to_str().unwrap()),
+                read_gz(out2.to_str().unwrap()),
+            )
         };
 
         let first = run(7);

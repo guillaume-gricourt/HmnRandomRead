@@ -5,9 +5,9 @@ use std::path::Path;
 use clap::{Parser, Subcommand};
 
 use hmnrandomread::{
-    bam_statistics, fusion, haplotype, io::FastqRawRecord, truth, FastaIndexedReader, BuiltProfile, Config, FastqReader, FastqRecord,
-    FastqWriter, FusionConfig, FusionGenerator, Generator, BamStatistics, ProfileDiversity,
-    ProfileSequencer, RandomGenerator, Reference,
+    bam_statistics, fusion, haplotype, io::FastqRawRecord, truth, BamStatistics, BuiltProfile,
+    Config, FastaIndexedReader, FastqReader, FastqRecord, FastqWriter, FusionConfig,
+    FusionGenerator, Generator, ProfileDiversity, ProfileSequencer, RandomGenerator, Reference,
 };
 
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
@@ -322,9 +322,7 @@ fn main() {
         Commands::BuildProfileSequencer { .. } => {
             std::process::exit(cmd_build_profile_sequencer(&cli.command))
         }
-        Commands::StatisticsBam { .. } => {
-            std::process::exit(cmd_statistics_bam(&cli.command))
-        }
+        Commands::StatisticsBam { .. } => std::process::exit(cmd_statistics_bam(&cli.command)),
         Commands::FusionSimulate { .. } => std::process::exit(cmd_fusion_simulate(&cli.command)),
         Commands::FusionSpike { .. } => std::process::exit(cmd_fusion_spike(&cli.command)),
         Commands::Version => println!("{VERSION}"),
@@ -369,11 +367,9 @@ fn load_profiles(
         None => None,
         Some(path) => {
             let Some(id) = parameter_profile_sequencer_id_str else {
-                return Err(
-                    "--parameter-profile-sequencer-id-str is required when \
+                return Err("--parameter-profile-sequencer-id-str is required when \
                      --input-profile-sequencer-csv is set"
-                        .to_string(),
-                );
+                    .to_string());
             };
             if !Path::new(path).is_file() {
                 return Err(format!("profile sequencer file not found: {path}"));
@@ -491,7 +487,9 @@ fn cmd_build_profile_sequencer(command: &Commands) -> i32 {
         output_profile_sequencer_csv,
     } = command
     else {
-        unreachable!("cmd_build_profile_sequencer is only called for Commands::BuildProfileSequencer");
+        unreachable!(
+            "cmd_build_profile_sequencer is only called for Commands::BuildProfileSequencer"
+        );
     };
 
     let has_fastq = !input_forward_fastq.is_empty() || !input_reverse_fastq.is_empty();
@@ -587,10 +585,7 @@ fn cmd_statistics_bam(command: &Commands) -> i32 {
         unreachable!("cmd_statistics_bam is only called for Commands::StatisticsBam");
     };
 
-    println!(
-        "statistics-bam: starting ({} BAM file(s))",
-        input_bam.len()
-    );
+    println!("statistics-bam: starting ({} BAM file(s))", input_bam.len());
 
     for path in input_bam {
         if !Path::new(path).is_file() {
@@ -800,8 +795,16 @@ fn cmd_fusion_simulate(command: &Commands) -> i32 {
         }
         let label = fusion::junction_label(five, three);
         let junction = fusion::build_junction(
-            &fusion::JunctionPartner { faidx: &five_ref.faidx, bp: five, variants: &[] },
-            &fusion::JunctionPartner { faidx: &three_ref.faidx, bp: three, variants: &[] },
+            &fusion::JunctionPartner {
+                faidx: &five_ref.faidx,
+                bp: five,
+                variants: &[],
+            },
+            &fusion::JunctionPartner {
+                faidx: &three_ref.faidx,
+                bp: three,
+                variants: &[],
+            },
             flank_len,
         );
         let (junction, junction_index) = match junction {
@@ -812,15 +815,8 @@ fn cmd_fusion_simulate(command: &Commands) -> i32 {
             }
         };
         println!("fusion-simulate: {n} read pair(s) on junction {label}");
-        let (f, r, t) = generator.generate(
-            &junction,
-            junction_index,
-            n,
-            five,
-            three,
-            &mut rng,
-            number,
-        );
+        let (f, r, t) =
+            generator.generate(&junction, junction_index, n, five, three, &mut rng, number);
         number += n;
         forward.extend(f);
         reverse.extend(r);
@@ -853,7 +849,10 @@ fn cmd_fusion_simulate(command: &Commands) -> i32 {
         ("breakpoint_secondary", secondary.position()),
         ("strand_primary", primary.strand.symbol().to_string()),
         ("strand_secondary", secondary.strand.symbol().to_string()),
-        ("reciprocal_rate", parameter_reciprocal_rate_float.to_string()),
+        (
+            "reciprocal_rate",
+            parameter_reciprocal_rate_float.to_string(),
+        ),
         ("length_reads", parameter_length_reads_int.to_string()),
         ("mean_insert_size", parameter_mean_insert_int.to_string()),
         ("std_insert_size", parameter_std_insert_int.to_string()),
@@ -862,9 +861,18 @@ fn cmd_fusion_simulate(command: &Commands) -> i32 {
         ("seed", parameter_seed_int.to_string()),
         ("requested_pairs", n_total.to_string()),
         ("produced_pairs", produced.to_string()),
-        ("split_read_pairs", count_support(fusion::Support::SplitRead).to_string()),
-        ("short_anchor_pairs", count_support(fusion::Support::ShortAnchor).to_string()),
-        ("discordant_pairs", count_support(fusion::Support::DiscordantPair).to_string()),
+        (
+            "split_read_pairs",
+            count_support(fusion::Support::SplitRead).to_string(),
+        ),
+        (
+            "short_anchor_pairs",
+            count_support(fusion::Support::ShortAnchor).to_string(),
+        ),
+        (
+            "discordant_pairs",
+            count_support(fusion::Support::DiscordantPair).to_string(),
+        ),
     ];
     if let Err(e) = truth::write_truth_tsv(output_truth_tsv, &metadata, &truth) {
         log::error!("failed to write '{output_truth_tsv}': {e}");
@@ -901,9 +909,7 @@ fn cmd_fusion_spike(command: &Commands) -> i32 {
 
     let fraction = *parameter_allelic_fraction_float;
     if !(fraction > 0.0 && fraction < 1.0) {
-        log::error!(
-            "--parameter-allelic-fraction-float must be within (0.0, 1.0), got {fraction}"
-        );
+        log::error!("--parameter-allelic-fraction-float must be within (0.0, 1.0), got {fraction}");
         return 1;
     }
     for path in [
@@ -1024,7 +1030,10 @@ fn cmd_fusion_spike(command: &Commands) -> i32 {
         );
         return 1;
     }
-    for (bp, reference) in [(primary, reference_primary), (secondary, reference_secondary)] {
+    for (bp, reference) in [
+        (primary, reference_primary),
+        (secondary, reference_secondary),
+    ] {
         if reference.duplicate_pairs == 0 && reference.len() >= UNMARKED_DUPLICATES_DEPTH {
             log::warn!(
                 "no read pair flagged as duplicate among the {} crossing {} in '{input_bam}': if \
@@ -1140,8 +1149,7 @@ fn cmd_fusion_spike(command: &Commands) -> i32 {
         (input_forward_fastq, output_forward_fastq, &pool_forward),
         (input_reverse_fastq, output_reverse_fastq, &pool_reverse),
     ] {
-        if let Err(e) =
-            write_merged_fastq(input, output, extra, &positions, sample_pairs, &removed)
+        if let Err(e) = write_merged_fastq(input, output, extra, &positions, sample_pairs, &removed)
         {
             log::error!("failed to write '{output}': {e}");
             return 1;
@@ -1161,21 +1169,45 @@ fn cmd_fusion_spike(command: &Commands) -> i32 {
         ("pool_strand_primary", pool.strand_primary.clone()),
         ("pool_strand_secondary", pool.strand_secondary.clone()),
         ("reference_fragments", fragments.to_string()),
-        ("reference_fragments_secondary", fragments_secondary.to_string()),
+        (
+            "reference_fragments_secondary",
+            fragments_secondary.to_string(),
+        ),
         ("reference_pileup_reads", reads.to_string()),
         ("target_allelic_fraction", fraction.to_string()),
         ("realized_allelic_fraction", format!("{realized:.9}")),
-        ("realized_allelic_fraction_secondary", format!("{realized_secondary:.9}")),
+        (
+            "realized_allelic_fraction_secondary",
+            format!("{realized_secondary:.9}"),
+        ),
         ("injected_pairs", n_target.to_string()),
-        ("injected_primary_secondary_pairs", injected_forward.to_string()),
+        (
+            "injected_primary_secondary_pairs",
+            injected_forward.to_string(),
+        ),
         ("injected_reciprocal_pairs", injected_reciprocal.to_string()),
         ("removed_reference_fragments", removed_molecules.to_string()),
-        ("removed_reference_duplicates", removed_duplicates.to_string()),
-        ("reference_duplicate_pairs", reference_primary.duplicate_pairs.to_string()),
-        ("removed_reference_fragments_primary", removed_primary.to_string()),
-        ("removed_reference_fragments_secondary", removed_secondary.to_string()),
+        (
+            "removed_reference_duplicates",
+            removed_duplicates.to_string(),
+        ),
+        (
+            "reference_duplicate_pairs",
+            reference_primary.duplicate_pairs.to_string(),
+        ),
+        (
+            "removed_reference_fragments_primary",
+            removed_primary.to_string(),
+        ),
+        (
+            "removed_reference_fragments_secondary",
+            removed_secondary.to_string(),
+        ),
         ("haplotype_variants_primary", variant_list(&haplotypes[0].1)),
-        ("haplotype_variants_secondary", variant_list(&haplotypes[1].1)),
+        (
+            "haplotype_variants_secondary",
+            variant_list(&haplotypes[1].1),
+        ),
         ("haplotype_rewritten_pairs", rewritten_pairs.to_string()),
         ("pool_pairs", pool_pairs.to_string()),
         ("sample_pairs", sample_pairs.to_string()),
@@ -1199,7 +1231,11 @@ fn variant_list(variants: &[haplotype::Variant]) -> String {
     if variants.is_empty() {
         return ".".to_string();
     }
-    variants.iter().map(ToString::to_string).collect::<Vec<_>>().join(",")
+    variants
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 /// Write a `fusion-simulate` pool: the produced reads and nothing else, so
@@ -1258,7 +1294,9 @@ fn find_reference<'a>(
     references
         .iter()
         .find(|faidx| faidx.seq_len(chrom).is_ok())
-        .ok_or_else(|| format!("chromosome '{chrom}' not found in any --input-reference-fasta").into())
+        .ok_or_else(|| {
+            format!("chromosome '{chrom}' not found in any --input-reference-fasta").into()
+        })
 }
 
 /// Make the sampled pool pairs carry the sample's variants, returning how
@@ -1300,12 +1338,18 @@ fn carry_sample_haplotype(
             .ok_or_else(|| format!("'{}' has no truth row", r1.header))?;
         if !junctions.contains_key(&row.junction) {
             let (five, three) = fusion::parse_junction_label(&row.junction)?;
-            let (five_faidx, three_faidx) =
-                (find_reference(references, &five.chrom)?, find_reference(references, &three.chrom)?);
+            let (five_faidx, three_faidx) = (
+                find_reference(references, &five.chrom)?,
+                find_reference(references, &three.chrom)?,
+            );
             let build = |carry: bool| {
                 let pick = |bp| if carry { variants_of(bp) } else { &[][..] };
                 fusion::build_junction(
-                    &fusion::JunctionPartner { faidx: five_faidx, bp: &five, variants: pick(&five) },
+                    &fusion::JunctionPartner {
+                        faidx: five_faidx,
+                        bp: &five,
+                        variants: pick(&five),
+                    },
                     &fusion::JunctionPartner {
                         faidx: three_faidx,
                         bp: &three,
@@ -1321,9 +1365,14 @@ fn carry_sample_haplotype(
         let fragment_len = row.fragment_stop - row.fragment_start;
         let read_len = r1.sequence.len();
         let out_of_range = || format!("fragment of '{}' doesn't fit its junction", row.qname);
-        let (clean_head, clean_tail) =
-            fusion::fragment_reads(clean, *clean_index, row.junction_offset, fragment_len, read_len)
-                .ok_or_else(out_of_range)?;
+        let (clean_head, clean_tail) = fusion::fragment_reads(
+            clean,
+            *clean_index,
+            row.junction_offset,
+            fragment_len,
+            read_len,
+        )
+        .ok_or_else(out_of_range)?;
         let (carried_head, carried_tail) = fusion::fragment_reads(
             carried,
             *carried_index,
@@ -1468,16 +1517,14 @@ fn collect_pool_records(
             (None, None) => break,
             (Some(r1), Some(r2)) => (r1, r2),
             (Some(_), None) => {
-                return Err(format!(
-                    "'{forward_path}' holds more records than '{reverse_path}'"
+                return Err(
+                    format!("'{forward_path}' holds more records than '{reverse_path}'").into(),
                 )
-                .into())
             }
             (None, Some(_)) => {
-                return Err(format!(
-                    "'{reverse_path}' holds more records than '{forward_path}'"
+                return Err(
+                    format!("'{reverse_path}' holds more records than '{forward_path}'").into(),
                 )
-                .into())
             }
         };
         // fusion-simulate gives both mates the byte-identical QNAME, so a
@@ -1533,7 +1580,10 @@ fn count_sample_pairs(
         .map_err(|e| format!("failed to read '{forward_path}': {e}"))?;
     let (reverse, reverse_removed) = count_fastq_records(reverse_path, removed)
         .map_err(|e| format!("failed to read '{reverse_path}': {e}"))?;
-    for (path, found) in [(forward_path, forward_removed), (reverse_path, reverse_removed)] {
+    for (path, found) in [
+        (forward_path, forward_removed),
+        (reverse_path, reverse_removed),
+    ] {
         if found != removed.len() as u64 {
             return Err(format!(
                 "'{path}' holds {found} of the {} reference fragment(s) picked for removal from \
@@ -1723,11 +1773,17 @@ mod tests {
         };
         assert_eq!(
             input_forward_fastq,
-            &vec!["lane1_r1.fastq.gz".to_string(), "lane2_r1.fastq.gz".to_string()]
+            &vec![
+                "lane1_r1.fastq.gz".to_string(),
+                "lane2_r1.fastq.gz".to_string()
+            ]
         );
         assert_eq!(
             input_reverse_fastq,
-            &vec!["lane1_r2.fastq.gz".to_string(), "lane2_r2.fastq.gz".to_string()]
+            &vec![
+                "lane1_r2.fastq.gz".to_string(),
+                "lane2_r2.fastq.gz".to_string()
+            ]
         );
     }
 
@@ -1805,12 +1861,7 @@ mod tests {
 
     #[test]
     fn statistics_bam_output_csv_is_optional() {
-        let cli = Cli::parse_from([
-            APP_NAME,
-            "statistics-bam",
-            "--input-bam",
-            "a.bam",
-        ]);
+        let cli = Cli::parse_from([APP_NAME, "statistics-bam", "--input-bam", "a.bam"]);
         let Commands::StatisticsBam {
             output_statistics_csv,
             ..
@@ -1891,11 +1942,17 @@ mod tests {
             let second = first + 11;
             records.push((
                 first,
-                format!("{name}\t{}\tchr1\t{first}\t60\t50M\t=\t{second}\t61\t{seq}\t{qual}\n", 99 + dup),
+                format!(
+                    "{name}\t{}\tchr1\t{first}\t60\t50M\t=\t{second}\t61\t{seq}\t{qual}\n",
+                    99 + dup
+                ),
             ));
             records.push((
                 second,
-                format!("{name}\t{}\tchr1\t{second}\t60\t50M\t=\t{first}\t-61\t{seq}\t{qual}\n", 147 + dup),
+                format!(
+                    "{name}\t{}\tchr1\t{second}\t60\t50M\t=\t{first}\t-61\t{seq}\t{qual}\n",
+                    147 + dup
+                ),
             ));
         };
         for i in 0..pairs {
@@ -1988,8 +2045,8 @@ mod tests {
             "pool_strand_secondary",
         ]
         .iter()
-            .filter_map(|k| reader.get(k).map(|v| (k.to_string(), v.to_string())))
-            .collect();
+        .filter_map(|k| reader.get(k).map(|v| (k.to_string(), v.to_string())))
+        .collect();
         let mut rows = Vec::new();
         while let Some(row) = reader.next_row().unwrap() {
             rows.push(row);
@@ -2004,7 +2061,11 @@ mod tests {
     }
 
     /// [`run_fusion_simulate`], with `extra` flags appended.
-    fn run_fusion_simulate_with(dir: &Path, pairs: u64, extra: &[&str]) -> (String, String, String) {
+    fn run_fusion_simulate_with(
+        dir: &Path,
+        pairs: u64,
+        extra: &[&str],
+    ) -> (String, String, String) {
         let mut args = vec!["--parameter-reciprocal-rate-float", "0.0"];
         args.extend_from_slice(extra);
         run_fusion_simulate_at(dir, pairs, "chr1:300", "chr1:900", &args)
@@ -2087,7 +2148,10 @@ mod tests {
         else {
             panic!("expected Commands::FusionSimulate");
         };
-        assert_eq!(input_reference_fasta, &vec!["genome.fa,1000,human".to_string()]);
+        assert_eq!(
+            input_reference_fasta,
+            &vec!["genome.fa,1000,human".to_string()]
+        );
         assert_eq!(parameter_breakpoint_primary_roi, "chr9:130854064");
         assert_eq!(*parameter_reciprocal_rate_float, 0.5);
         assert_eq!(output_truth_tsv, "pool.tsv");
@@ -2212,10 +2276,13 @@ mod tests {
     fn fusion_simulate_takes_both_partners_on_the_minus_strand() {
         // TMPRSS2::ERG-like.
         let dir = tempfile::tempdir().unwrap();
-        let (_, _, tsv) = run_fusion_simulate_at(dir.path(), 20, "chr1:300:-", "chr1:900:-", &[
-            "--parameter-reciprocal-rate-float",
-            "0.0",
-        ]);
+        let (_, _, tsv) = run_fusion_simulate_at(
+            dir.path(),
+            20,
+            "chr1:300:-",
+            "chr1:900:-",
+            &["--parameter-reciprocal-rate-float", "0.0"],
+        );
         let (metadata, rows) = truth_rows(&tsv);
         assert!(metadata.contains(&("strand_primary".to_string(), "-".to_string())));
         assert!(rows.iter().all(|r| r.junction == "chr1:300(-)>chr1:900(-)"));
@@ -2224,10 +2291,13 @@ mod tests {
     #[test]
     fn fusion_simulate_takes_a_partner_without_a_strand_on_plus() {
         let dir = tempfile::tempdir().unwrap();
-        let (_, _, tsv) = run_fusion_simulate_at(dir.path(), 20, "chr1:300", "chr1:900:-", &[
-            "--parameter-reciprocal-rate-float",
-            "0.0",
-        ]);
+        let (_, _, tsv) = run_fusion_simulate_at(
+            dir.path(),
+            20,
+            "chr1:300",
+            "chr1:900:-",
+            &["--parameter-reciprocal-rate-float", "0.0"],
+        );
         let (_, rows) = truth_rows(&tsv);
         assert!(rows.iter().all(|r| r.junction == "chr1:300(+)>chr1:900(-)"));
     }
@@ -2236,11 +2306,13 @@ mod tests {
     fn fusion_simulate_keeps_fixed_opposite_strands_on_every_pair() {
         // ETV6::RUNX1-like: 5' partner on `+`, 3' partner on `-`.
         let dir = tempfile::tempdir().unwrap();
-        let (_, _, tsv) =
-            run_fusion_simulate_at(dir.path(), 400, "chr1:300:+", "chr1:900:-", &[
-                "--parameter-reciprocal-rate-float",
-                "0.0",
-            ]);
+        let (_, _, tsv) = run_fusion_simulate_at(
+            dir.path(),
+            400,
+            "chr1:300:+",
+            "chr1:900:-",
+            &["--parameter-reciprocal-rate-float", "0.0"],
+        );
         let (metadata, rows) = truth_rows(&tsv);
         assert_eq!(rows.len(), 400);
         assert!(rows.iter().all(|r| r.junction == "chr1:300(+)>chr1:900(-)"));
@@ -2287,8 +2359,18 @@ mod tests {
         let bam = write_indexed_bam(dir.path(), 20);
         let sample_r1 = write_sample_fastq(dir.path(), "sample_R1.fastq", 20, 60, 1);
         let sample_r2 = write_sample_fastq(dir.path(), "sample_R2.fastq", 20, 60, 2);
-        let out_r1 = dir.path().join("out_R1.fastq.gz").to_str().unwrap().to_string();
-        let out_r2 = dir.path().join("out_R2.fastq.gz").to_str().unwrap().to_string();
+        let out_r1 = dir
+            .path()
+            .join("out_R1.fastq.gz")
+            .to_str()
+            .unwrap()
+            .to_string();
+        let out_r2 = dir
+            .path()
+            .join("out_R2.fastq.gz")
+            .to_str()
+            .unwrap()
+            .to_string();
         let out_tsv = dir.path().join("out.tsv").to_str().unwrap().to_string();
 
         let cli = Cli::parse_from([
@@ -2362,11 +2444,18 @@ mod tests {
 
         let names = names(&forward);
         let kept = |prefix: &str| {
-            (0..20).filter(|i| names.contains(&format!("{prefix}{i}"))).count()
+            (0..20)
+                .filter(|i| names.contains(&format!("{prefix}{i}")))
+                .count()
         };
         assert_eq!(kept("p"), 16);
         assert_eq!(kept("s"), 16);
-        assert_eq!((0..60).filter(|i| names.contains(&format!("sample_{i}"))).count(), 60);
+        assert_eq!(
+            (0..60)
+                .filter(|i| names.contains(&format!("sample_{i}")))
+                .count(),
+            60
+        );
 
         let injected: Vec<usize> = forward
             .iter()
@@ -2379,7 +2468,9 @@ mod tests {
         assert_ne!(injected, vec![92, 93, 94, 95]);
         // ...and every injected name is one the truth file claims.
         let claimed: HashSet<&str> = rows.iter().map(|r| r.qname.as_str()).collect();
-        assert!(injected.iter().all(|&i| claimed.contains(forward[i].as_str())));
+        assert!(injected
+            .iter()
+            .all(|&i| claimed.contains(forward[i].as_str())));
     }
 
     #[test]
@@ -2398,7 +2489,11 @@ mod tests {
         let sample_r1 = write_sample_fastq(dir.path(), "sample_R1.fastq", 20, 60, 1);
         let sample_r2 = write_sample_fastq(dir.path(), "sample_R2.fastq", 20, 60, 2);
         let out = |name: &str| dir.path().join(name).to_str().unwrap().to_string();
-        let (out_r1, out_r2, out_tsv) = (out("out_R1.fastq.gz"), out("out_R2.fastq.gz"), out("out.tsv"));
+        let (out_r1, out_r2, out_tsv) = (
+            out("out_R1.fastq.gz"),
+            out("out_R2.fastq.gz"),
+            out("out.tsv"),
+        );
 
         let cli = Cli::parse_from([
             APP_NAME,
@@ -2488,8 +2583,18 @@ mod tests {
         };
         let sample_r1 = write_named_fastq(dir.path(), "sample_R1.fastq", names(), 1);
         let sample_r2 = write_named_fastq(dir.path(), "sample_R2.fastq", names(), 2);
-        let out_r1 = dir.path().join("out_R1.fastq.gz").to_str().unwrap().to_string();
-        let out_r2 = dir.path().join("out_R2.fastq.gz").to_str().unwrap().to_string();
+        let out_r1 = dir
+            .path()
+            .join("out_R1.fastq.gz")
+            .to_str()
+            .unwrap()
+            .to_string();
+        let out_r2 = dir
+            .path()
+            .join("out_R2.fastq.gz")
+            .to_str()
+            .unwrap()
+            .to_string();
         let out_tsv = dir.path().join("out.tsv").to_str().unwrap().to_string();
 
         let cli = Cli::parse_from([
@@ -2528,7 +2633,9 @@ mod tests {
             .iter()
             .map(|h| read_name(h).to_string())
             .collect();
-        let removed: Vec<usize> = (0..20).filter(|i| !names.contains(&format!("p{i}"))).collect();
+        let removed: Vec<usize> = (0..20)
+            .filter(|i| !names.contains(&format!("p{i}")))
+            .collect();
         assert_eq!(removed.len(), 4);
         for i in 0..20 {
             assert_eq!(
@@ -2550,8 +2657,18 @@ mod tests {
         // Not the FASTQ the BAM was aligned from: none of its fragments.
         let sample_r1 = write_sample_fastq(dir.path(), "sample_R1.fastq", 0, 50, 1);
         let sample_r2 = write_sample_fastq(dir.path(), "sample_R2.fastq", 0, 50, 2);
-        let out_r1 = dir.path().join("out_R1.fastq.gz").to_str().unwrap().to_string();
-        let out_r2 = dir.path().join("out_R2.fastq.gz").to_str().unwrap().to_string();
+        let out_r1 = dir
+            .path()
+            .join("out_R1.fastq.gz")
+            .to_str()
+            .unwrap()
+            .to_string();
+        let out_r2 = dir
+            .path()
+            .join("out_R2.fastq.gz")
+            .to_str()
+            .unwrap()
+            .to_string();
         let out_tsv = dir.path().join("out.tsv").to_str().unwrap().to_string();
 
         let cli = Cli::parse_from([

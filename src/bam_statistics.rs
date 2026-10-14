@@ -222,7 +222,10 @@ mod tests {
 
     fn write_file(dir: &Path, name: &str, contents: &str) -> String {
         let path = dir.join(name);
-        File::create(&path).unwrap().write_all(contents.as_bytes()).unwrap();
+        File::create(&path)
+            .unwrap()
+            .write_all(contents.as_bytes())
+            .unwrap();
         path.to_str().unwrap().to_string()
     }
 

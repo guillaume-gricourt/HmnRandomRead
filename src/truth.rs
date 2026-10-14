@@ -155,7 +155,10 @@ mod tests {
     fn round_trips_metadata_and_rows() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("truth.tsv");
-        let rows = vec![row("hmnrr_fusion_a_0000000000"), row("hmnrr_fusion_a_0000000001")];
+        let rows = vec![
+            row("hmnrr_fusion_a_0000000000"),
+            row("hmnrr_fusion_a_0000000001"),
+        ];
         write_truth_tsv(
             &path,
             &[

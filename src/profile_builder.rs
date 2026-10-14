@@ -146,7 +146,10 @@ impl BuiltProfile {
                     leading_h
                 } as usize;
 
-                accumulators.entry(strand).or_default().add_at(&qual, offset);
+                accumulators
+                    .entry(strand)
+                    .or_default()
+                    .add_at(&qual, offset);
             }
         }
 
@@ -297,7 +300,10 @@ mod tests {
 
     fn write_fastq(dir: &Path, name: &str, contents: &str) -> String {
         let path = dir.join(name);
-        File::create(&path).unwrap().write_all(contents.as_bytes()).unwrap();
+        File::create(&path)
+            .unwrap()
+            .write_all(contents.as_bytes())
+            .unwrap();
         path.to_str().unwrap().to_string()
     }
 
@@ -315,7 +321,8 @@ mod tests {
             "@NB552023:1:AAA:1:1:1:1 2:N:0:1\nACGT\n+\nIIII\n",
         );
 
-        let profile = BuiltProfile::from_fastq("n1", &[forward.as_str()], &[reverse.as_str()]).unwrap();
+        let profile =
+            BuiltProfile::from_fastq("n1", &[forward.as_str()], &[reverse.as_str()]).unwrap();
         assert_eq!(profile.sequencer, "nextseq 550");
         assert_eq!(profile.cycles[&FORWARD].len(), 4);
         assert_eq!(profile.cycles[&REVERSE].len(), 4);
@@ -328,14 +335,24 @@ mod tests {
     #[test]
     fn write_csv_round_trips_through_profile_sequencer_parser() {
         let dir = tempfile::tempdir().unwrap();
-        let forward = write_fastq(dir.path(), "r1.fastq", "@inst:1:AAA:1:1:1:1\nACGT\n+\nIIII\n");
-        let reverse = write_fastq(dir.path(), "r2.fastq", "@inst:1:AAA:1:1:1:1\nACGT\n+\nIIII\n");
-        let profile = BuiltProfile::from_fastq("n1", &[forward.as_str()], &[reverse.as_str()]).unwrap();
+        let forward = write_fastq(
+            dir.path(),
+            "r1.fastq",
+            "@inst:1:AAA:1:1:1:1\nACGT\n+\nIIII\n",
+        );
+        let reverse = write_fastq(
+            dir.path(),
+            "r2.fastq",
+            "@inst:1:AAA:1:1:1:1\nACGT\n+\nIIII\n",
+        );
+        let profile =
+            BuiltProfile::from_fastq("n1", &[forward.as_str()], &[reverse.as_str()]).unwrap();
 
         let out_path = dir.path().join("profile_sequencer.csv");
         profile.write_csv(&out_path).unwrap();
 
-        let parsed = crate::profile_sequencer::ProfileSequencer::parse_csv(&out_path, "n1", true).unwrap();
+        let parsed =
+            crate::profile_sequencer::ProfileSequencer::parse_csv(&out_path, "n1", true).unwrap();
         assert!(parsed.rate(FORWARD, 0).is_some());
         assert!(parsed.rate(REVERSE, 0).is_some());
     }
@@ -351,10 +368,26 @@ mod tests {
     #[test]
     fn pools_reads_across_multiple_lane_files() {
         let dir = tempfile::tempdir().unwrap();
-        let lane1_fwd = write_fastq(dir.path(), "l1_r1.fastq", "@inst:1:AAA:1:1:1:1\nACGT\n+\nIIII\n");
-        let lane2_fwd = write_fastq(dir.path(), "l2_r1.fastq", "@inst:1:AAA:2:1:1:1\nACGT\n+\nIIII\n");
-        let lane1_rev = write_fastq(dir.path(), "l1_r2.fastq", "@inst:1:AAA:1:1:1:1\nACGT\n+\nIIII\n");
-        let lane2_rev = write_fastq(dir.path(), "l2_r2.fastq", "@inst:1:AAA:2:1:1:1\nACGT\n+\nIIII\n");
+        let lane1_fwd = write_fastq(
+            dir.path(),
+            "l1_r1.fastq",
+            "@inst:1:AAA:1:1:1:1\nACGT\n+\nIIII\n",
+        );
+        let lane2_fwd = write_fastq(
+            dir.path(),
+            "l2_r1.fastq",
+            "@inst:1:AAA:2:1:1:1\nACGT\n+\nIIII\n",
+        );
+        let lane1_rev = write_fastq(
+            dir.path(),
+            "l1_r2.fastq",
+            "@inst:1:AAA:1:1:1:1\nACGT\n+\nIIII\n",
+        );
+        let lane2_rev = write_fastq(
+            dir.path(),
+            "l2_r2.fastq",
+            "@inst:1:AAA:2:1:1:1\nACGT\n+\nIIII\n",
+        );
 
         let profile = BuiltProfile::from_fastq(
             "n1",
@@ -364,24 +397,31 @@ mod tests {
         .unwrap();
         // 2 reads pooled per strand, both with identical quality: the
         // averaged rate should be identical to what a single read gives.
-        let single = BuiltProfile::from_fastq("n1", &[lane1_fwd.as_str()], &[lane1_rev.as_str()])
-            .unwrap();
+        let single =
+            BuiltProfile::from_fastq("n1", &[lane1_fwd.as_str()], &[lane1_rev.as_str()]).unwrap();
         assert_eq!(profile.cycles[&FORWARD], single.cycles[&FORWARD]);
     }
 
     #[test]
     fn missing_reverse_reads_is_an_error_even_with_forward_data() {
         let dir = tempfile::tempdir().unwrap();
-        let forward = write_fastq(dir.path(), "r1.fastq", "@inst:1:AAA:1:1:1:1\nACGT\n+\nIIII\n");
+        let forward = write_fastq(
+            dir.path(),
+            "r1.fastq",
+            "@inst:1:AAA:1:1:1:1\nACGT\n+\nIIII\n",
+        );
         let reverse = write_fastq(dir.path(), "r2.fastq", "");
         assert!(BuiltProfile::from_fastq("n1", &[forward.as_str()], &[reverse.as_str()]).is_err());
     }
 
     #[test]
     fn hardclip_lengths_reads_both_ends() {
-        let cigar =
-            bam::record::CigarString(vec![Cigar::HardClip(3), Cigar::Match(10), Cigar::HardClip(2)])
-                .into_view(0);
+        let cigar = bam::record::CigarString(vec![
+            Cigar::HardClip(3),
+            Cigar::Match(10),
+            Cigar::HardClip(2),
+        ])
+        .into_view(0);
         assert_eq!(hardclip_lengths(&cigar), (3, 2));
     }
 
@@ -429,7 +469,10 @@ mod tests {
             "@HD\tVN:1.6\n@SQ\tSN:chr1\tLN:100\n\
              NB552023:1:AAA:1:1:1:1\t144\tchr1\t1\t60\t3H10M2H\t*\t0\t0\tACGTACGTAC\t{qual}\n"
         );
-        File::create(&path).unwrap().write_all(sam.as_bytes()).unwrap();
+        File::create(&path)
+            .unwrap()
+            .write_all(sam.as_bytes())
+            .unwrap();
 
         let profile = BuiltProfile::from_bam("n1", &[path.to_str().unwrap()]).unwrap();
         assert_eq!(profile.sequencer, "nextseq 550");
@@ -450,7 +493,10 @@ mod tests {
         let sam = format!(
             "@HD\tVN:1.6\n@SQ\tSN:chr1\tLN:100\n{qname}\t64\tchr1\t1\t60\t4M\t*\t0\t0\tACGT\tIIII\n"
         );
-        File::create(&path).unwrap().write_all(sam.as_bytes()).unwrap();
+        File::create(&path)
+            .unwrap()
+            .write_all(sam.as_bytes())
+            .unwrap();
         path.to_str().unwrap().to_string()
     }
 
@@ -460,8 +506,7 @@ mod tests {
         let bam1 = write_sam_with_one_forward_read(dir.path(), "a.sam", "NB552023:1:AAA:1:1:1:1");
         let bam2 = write_sam_with_one_forward_read(dir.path(), "b.sam", "NB552023:1:AAA:2:1:1:1");
 
-        let pooled =
-            BuiltProfile::from_bam("n1", &[bam1.as_str(), bam2.as_str()]).unwrap();
+        let pooled = BuiltProfile::from_bam("n1", &[bam1.as_str(), bam2.as_str()]).unwrap();
         let single = BuiltProfile::from_bam("n1", &[bam1.as_str()]).unwrap();
         // Both files have identical single-read quality: pooling them
         // shouldn't change the averaged rate, only confirm both contributed

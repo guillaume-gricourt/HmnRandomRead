@@ -214,26 +214,8 @@ mod tests {
 
     #[test]
     fn mate_matches_strand() {
-        let fwd = FastqRecord::new(
-            "A".into(),
-            33,
-            0,
-            true,
-            "r".into(),
-            "c".into(),
-            0,
-            1,
-        );
-        let rev = FastqRecord::new(
-            "A".into(),
-            33,
-            0,
-            false,
-            "r".into(),
-            "c".into(),
-            0,
-            1,
-        );
+        let fwd = FastqRecord::new("A".into(), 33, 0, true, "r".into(), "c".into(), 0, 1);
+        let rev = FastqRecord::new("A".into(), 33, 0, false, "r".into(), "c".into(), 0, 1);
         assert_eq!(fwd.mate(), 0);
         assert_eq!(rev.mate(), 1);
     }

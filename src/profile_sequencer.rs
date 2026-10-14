@@ -76,9 +76,7 @@ impl ProfileSequencer {
                         .map(|s| s.parse::<f32>().map(|v| v / 100.0))
                         .collect::<Result<_, _>>()?;
                     if cycle_total != cycle_error.len() {
-                        return Err(parse_err(
-                            "cycle total discordant with cycles indicated",
-                        ));
+                        return Err(parse_err("cycle total discordant with cycles indicated"));
                     }
                     last_strand = strand;
                     profile.errors.entry(strand).or_insert(cycle_error);
@@ -137,9 +135,8 @@ mod tests {
     #[test]
     fn parses_paired_profile_with_both_strands() {
         let dir = tempfile::tempdir().unwrap();
-        let contents = format!(
-            "{HEADER}n1,seq,flow,NA,forward,3,1;2;3\nn1,seq,flow,NA,reverse,3,4;5;6\n"
-        );
+        let contents =
+            format!("{HEADER}n1,seq,flow,NA,forward,3,1;2;3\nn1,seq,flow,NA,reverse,3,4;5;6\n");
         let path = write_profile(dir.path(), &contents);
         let profile = ProfileSequencer::parse_csv(&path, "n1", true).unwrap();
         assert_eq!(profile.rate(FORWARD, 0).unwrap(), 0.01);

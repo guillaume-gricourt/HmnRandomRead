@@ -42,7 +42,9 @@ impl Strand {
         match spec {
             "+" => Ok(Strand::Forward),
             "-" => Ok(Strand::Reverse),
-            _ => Err(parse_err(format!("malformed strand '{spec}', expected '+' or '-'"))),
+            _ => Err(parse_err(format!(
+                "malformed strand '{spec}', expected '+' or '-'"
+            ))),
         }
     }
 
@@ -76,19 +78,31 @@ pub struct Breakpoint {
 impl Breakpoint {
     /// Parse a `chrom:pos` spec (1-based `pos`), on the `+` strand.
     pub fn parse(spec: &str) -> Result<Self, Box<dyn Error>> {
-        let (chrom, pos) = spec
-            .rsplit_once(':')
-            .ok_or_else(|| parse_err(format!("malformed breakpoint '{spec}', expected 'chrom:pos'")))?;
+        let (chrom, pos) = spec.rsplit_once(':').ok_or_else(|| {
+            parse_err(format!(
+                "malformed breakpoint '{spec}', expected 'chrom:pos'"
+            ))
+        })?;
         if chrom.is_empty() {
-            return Err(parse_err(format!("malformed breakpoint '{spec}', chrom is empty")));
+            return Err(parse_err(format!(
+                "malformed breakpoint '{spec}', chrom is empty"
+            )));
         }
-        let pos: u64 = pos
-            .parse()
-            .map_err(|_| parse_err(format!("malformed breakpoint '{spec}', pos isn't a positive integer")))?;
+        let pos: u64 = pos.parse().map_err(|_| {
+            parse_err(format!(
+                "malformed breakpoint '{spec}', pos isn't a positive integer"
+            ))
+        })?;
         if pos == 0 {
-            return Err(parse_err(format!("malformed breakpoint '{spec}', pos must be >= 1")));
+            return Err(parse_err(format!(
+                "malformed breakpoint '{spec}', pos must be >= 1"
+            )));
         }
-        Ok(Breakpoint { chrom: chrom.to_string(), pos, strand: Strand::Forward })
+        Ok(Breakpoint {
+            chrom: chrom.to_string(),
+            pos,
+            strand: Strand::Forward,
+        })
     }
 
     /// Parse a `chrom:pos[:+|-]` spec: a [`Breakpoint::parse`] spec with an
@@ -98,7 +112,9 @@ impl Breakpoint {
             Some((position, strand @ ("+" | "-"))) => {
                 let strand = Strand::parse(strand)?;
                 let bp = Breakpoint::parse(position).map_err(|_| {
-                    parse_err(format!("malformed breakpoint '{spec}', expected 'chrom:pos[:+|-]'"))
+                    parse_err(format!(
+                        "malformed breakpoint '{spec}', expected 'chrom:pos[:+|-]'"
+                    ))
                 })?;
                 Ok(Breakpoint { strand, ..bp })
             }
@@ -166,7 +182,9 @@ pub fn parse_junction_label(label: &str) -> Result<(Breakpoint, Breakpoint), Box
         let (position, strand) = spec
             .strip_suffix(')')
             .and_then(|s| s.rsplit_once('('))
-            .ok_or_else(|| parse_err(format!("malformed junction partner '{spec}' in '{label}'")))?;
+            .ok_or_else(|| {
+                parse_err(format!("malformed junction partner '{spec}' in '{label}'"))
+            })?;
         let mut bp = Breakpoint::parse(position)?;
         bp.strand = Strand::parse(strand)?;
         Ok(bp)
@@ -194,7 +212,9 @@ pub fn fragment_reads(
     let take = read_len.min(fragment_len);
     Some((
         fragment[..take].to_string(),
-        fragment[fragment_len - take..].to_string().reverse_complement(),
+        fragment[fragment_len - take..]
+            .to_string()
+            .reverse_complement(),
     ))
 }
 
@@ -222,7 +242,10 @@ pub fn carry_variants(read: &str, clean: &str, carried: &str) -> String {
 
 /// Number of positions where `a` and `b` differ, case aside.
 pub fn mismatches(a: &str, b: &str) -> usize {
-    a.bytes().zip(b.bytes()).filter(|(x, y)| !x.eq_ignore_ascii_case(y)).count()
+    a.bytes()
+        .zip(b.bytes())
+        .filter(|(x, y)| !x.eq_ignore_ascii_case(y))
+        .count()
         + a.len().abs_diff(b.len())
 }
 
@@ -300,7 +323,10 @@ fn fetch_flank(
     if bp.pos > contig_len {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            format!("breakpoint position {} exceeds '{}' length ({contig_len})", bp.pos, bp.chrom),
+            format!(
+                "breakpoint position {} exceeds '{}' length ({contig_len})",
+                bp.pos, bp.chrom
+            ),
         ));
     }
     match side {
@@ -332,7 +358,10 @@ pub fn flank_region(
     if bp.pos > contig_len {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            format!("breakpoint position {} exceeds '{}' length ({contig_len})", bp.pos, bp.chrom),
+            format!(
+                "breakpoint position {} exceeds '{}' length ({contig_len})",
+                bp.pos, bp.chrom
+            ),
         ));
     }
     let begin0 = bp.pos.saturating_sub(flank_len);
@@ -526,7 +555,10 @@ fn unclipped_five_prime(pos: i64, reverse: bool, cigar: &[Cigar]) -> i64 {
         let reference_len: i64 = cigar
             .iter()
             .map(|c| match c {
-                Cigar::Match(n) | Cigar::Del(n) | Cigar::RefSkip(n) | Cigar::Equal(n)
+                Cigar::Match(n)
+                | Cigar::Del(n)
+                | Cigar::RefSkip(n)
+                | Cigar::Equal(n)
                 | Cigar::Diff(n) => *n as i64,
                 _ => 0,
             })
@@ -537,7 +569,9 @@ fn unclipped_five_prime(pos: i64, reverse: bool, cigar: &[Cigar]) -> i64 {
 
 fn duplicate_key(record: &bam::Record, libraries: &HashMap<String, String>) -> DuplicateKey {
     let library = match record.aux(b"RG") {
-        Ok(bam::record::Aux::String(rg)) => libraries.get(rg).cloned().unwrap_or_else(|| rg.to_string()),
+        Ok(bam::record::Aux::String(rg)) => {
+            libraries.get(rg).cloned().unwrap_or_else(|| rg.to_string())
+        }
         _ => String::new(),
     };
     let own = unclipped_five_prime(record.pos(), record.is_reverse(), &record.cigar());
@@ -549,7 +583,14 @@ fn duplicate_key(record: &bam::Record, libraries: &HashMap<String, String>) -> D
         Some(cigar) => unclipped_five_prime(record.mpos(), record.is_mate_reverse(), &cigar.0),
         None => record.mpos(),
     };
-    (library, own, record.is_reverse(), record.mtid(), mate, record.is_mate_reverse())
+    (
+        library,
+        own,
+        record.is_reverse(),
+        record.mtid(),
+        mate,
+        record.is_mate_reverse(),
+    )
 }
 
 /// Read group ID -> library (`LB`), for [`duplicate_key`]: duplicates are
@@ -649,7 +690,11 @@ pub fn reference_fragments_at(
         // depend on the BAM's order.
         for (key, qname) in copies {
             if let Some(representative) = representatives.get(&key).and_then(|r| r.iter().min()) {
-                result.duplicates.entry(representative.clone()).or_default().push(qname);
+                result
+                    .duplicates
+                    .entry(representative.clone())
+                    .or_default()
+                    .push(qname);
             }
         }
         return Ok(result);
@@ -879,16 +924,27 @@ mod tests {
     use std::io::Write;
 
     fn bp(chrom: &str, pos: u64) -> Breakpoint {
-        Breakpoint { chrom: chrom.into(), pos, strand: Strand::Forward }
+        Breakpoint {
+            chrom: chrom.into(),
+            pos,
+            strand: Strand::Forward,
+        }
     }
 
     fn partner<'a>(faidx: &'a FastaIndexedReader, bp: &'a Breakpoint) -> JunctionPartner<'a> {
-        JunctionPartner { faidx, bp, variants: &[] }
+        JunctionPartner {
+            faidx,
+            bp,
+            variants: &[],
+        }
     }
 
     fn write_fasta(dir: &std::path::Path, contents: &str) -> String {
         let path = dir.join("ref.fa");
-        std::fs::File::create(&path).unwrap().write_all(contents.as_bytes()).unwrap();
+        std::fs::File::create(&path)
+            .unwrap()
+            .write_all(contents.as_bytes())
+            .unwrap();
         path.to_str().unwrap().to_string()
     }
 
@@ -909,7 +965,10 @@ mod tests {
     #[test]
     fn breakpoint_parse_stranded_reads_the_strand_suffix() {
         let bp = Breakpoint::parse_stranded("chr21:34887000:-").unwrap();
-        assert_eq!((bp.chrom.as_str(), bp.pos, bp.strand), ("chr21", 34887000, Strand::Reverse));
+        assert_eq!(
+            (bp.chrom.as_str(), bp.pos, bp.strand),
+            ("chr21", 34887000, Strand::Reverse)
+        );
         // The position stays parseable on its own, strand left out.
         assert_eq!(bp.position(), "chr21:34887000");
         let bp = Breakpoint::parse_stranded("chr12:11869000:+").unwrap();
@@ -948,7 +1007,8 @@ mod tests {
         // bases if flank_len=10), right flank is bases [11..=15] (5 bases).
         let left_bp = bp("chr1", 10);
         let right_bp = bp("chr1", 10);
-        let (junction, idx) = build_junction(&partner(&faidx, &left_bp), &partner(&faidx, &right_bp), 10).unwrap();
+        let (junction, idx) =
+            build_junction(&partner(&faidx, &left_bp), &partner(&faidx, &right_bp), 10).unwrap();
         assert_eq!(idx, 10);
         assert_eq!(junction.len(), 20); // left=10 (bases 1..=10), right=10 (bases 11..=20)
     }
@@ -996,10 +1056,18 @@ mod tests {
             chrom: "chr1".into(),
             pos0: 6,
             reference: "G".into(),
-            allele: crate::haplotype::Allele { base: b'T', insertion: vec![], deletion: 0 },
+            allele: crate::haplotype::Allele {
+                base: b'T',
+                insertion: vec![],
+                deletion: 0,
+            },
             homozygous: true,
         }];
-        let five_partner = JunctionPartner { faidx: &faidx, bp: &five, variants: &variants };
+        let five_partner = JunctionPartner {
+            faidx: &faidx,
+            bp: &five,
+            variants: &variants,
+        };
         let (junction, _) = build_junction(&five_partner, &partner(&faidx, &three), 10).unwrap();
         assert_eq!(junction, "ACCAGGCCCA");
     }
@@ -1046,7 +1114,10 @@ mod tests {
 
     #[test]
     fn five_prime_position_drops_the_strand() {
-        assert_eq!(five_prime_position("chr2:42522656(-)>chr2:29446394(+)"), "chr2:42522656");
+        assert_eq!(
+            five_prime_position("chr2:42522656(-)>chr2:29446394(+)"),
+            "chr2:42522656"
+        );
     }
 
     #[test]
@@ -1054,7 +1125,10 @@ mod tests {
         let mut left = bp("chr2", 42522656);
         left.strand = Strand::Reverse;
         let right = bp("chr2", 29446394);
-        assert_eq!(junction_label(&left, &right), "chr2:42522656(-)>chr2:29446394(+)");
+        assert_eq!(
+            junction_label(&left, &right),
+            "chr2:42522656(-)>chr2:29446394(+)"
+        );
     }
 
     #[test]
@@ -1118,7 +1192,10 @@ mod tests {
                 pick_fragment_spanning_junction(seq_len, junction_index, &mut rng, 300.0, 50.0)
                     .unwrap();
             assert!(stop <= seq_len);
-            assert!(start < junction_index && junction_index < stop, "[{start},{stop})");
+            assert!(
+                start < junction_index && junction_index < stop,
+                "[{start},{stop})"
+            );
         }
     }
 
@@ -1172,13 +1249,22 @@ mod tests {
         // Junction 30 bases into the head read: split.
         assert_eq!(classify_support(370, 670, 400, 50, 20), Support::SplitRead);
         // 10 bases into the head read: short anchor.
-        assert_eq!(classify_support(390, 690, 400, 50, 20), Support::ShortAnchor);
+        assert_eq!(
+            classify_support(390, 690, 400, 50, 20),
+            Support::ShortAnchor
+        );
         // 30 bases before the end of the tail read: split.
         assert_eq!(classify_support(130, 430, 400, 50, 20), Support::SplitRead);
         // In the insert between the reads: discordant.
-        assert_eq!(classify_support(250, 550, 400, 50, 20), Support::DiscordantPair);
+        assert_eq!(
+            classify_support(250, 550, 400, 50, 20),
+            Support::DiscordantPair
+        );
         // Exactly on the head read's end: its reads each sit on one side.
-        assert_eq!(classify_support(350, 650, 400, 50, 20), Support::DiscordantPair);
+        assert_eq!(
+            classify_support(350, 650, 400, 50, 20),
+            Support::DiscordantPair
+        );
         // A fragment shorter than a read: both reads cover all of it.
         assert_eq!(classify_support(380, 420, 400, 50, 20), Support::SplitRead);
     }
@@ -1190,7 +1276,8 @@ mod tests {
         let faidx = FastaIndexedReader::open(&path).unwrap();
         let left_bp = bp("chr1", 200);
         let right_bp = bp("chr1", 200);
-        let (junction, idx) = build_junction(&partner(&faidx, &left_bp), &partner(&faidx, &right_bp), 150).unwrap();
+        let (junction, idx) =
+            build_junction(&partner(&faidx, &left_bp), &partner(&faidx, &right_bp), 150).unwrap();
 
         let config = FusionConfig {
             length_reads: 50,
@@ -1227,7 +1314,8 @@ mod tests {
         let path = write_fasta(dir.path(), &format!(">chr1\n{}\n", "ACGT".repeat(100)));
         let faidx = FastaIndexedReader::open(&path).unwrap();
         let bp = bp("chr1", 200);
-        let (junction, idx) = build_junction(&partner(&faidx, &bp), &partner(&faidx, &bp), 150).unwrap();
+        let (junction, idx) =
+            build_junction(&partner(&faidx, &bp), &partner(&faidx, &bp), 150).unwrap();
 
         let config = FusionConfig {
             length_reads: 50,
@@ -1276,8 +1364,7 @@ mod tests {
         {
             let sam_reader = bam::Reader::from_path(&sam_path).unwrap();
             let header = bam::Header::from_template(sam_reader.header());
-            let mut writer =
-                bam::Writer::from_path(&bam_path, &header, bam::Format::Bam).unwrap();
+            let mut writer = bam::Writer::from_path(&bam_path, &header, bam::Format::Bam).unwrap();
             let mut sam_reader = bam::Reader::from_path(&sam_path).unwrap();
             let mut record = bam::Record::new();
             while let Some(result) = sam_reader.read(&mut record) {
@@ -1308,8 +1395,7 @@ mod tests {
         {
             let sam_reader = bam::Reader::from_path(&sam_path).unwrap();
             let header = bam::Header::from_template(sam_reader.header());
-            let mut writer =
-                bam::Writer::from_path(&bam_path, &header, bam::Format::Bam).unwrap();
+            let mut writer = bam::Writer::from_path(&bam_path, &header, bam::Format::Bam).unwrap();
             let mut sam_reader = bam::Reader::from_path(&sam_path).unwrap();
             let mut record = bam::Record::new();
             while let Some(result) = sam_reader.read(&mut record) {
@@ -1345,8 +1431,7 @@ mod tests {
         {
             let sam_reader = bam::Reader::from_path(&sam_path).unwrap();
             let header = bam::Header::from_template(sam_reader.header());
-            let mut writer =
-                bam::Writer::from_path(&bam_path, &header, bam::Format::Bam).unwrap();
+            let mut writer = bam::Writer::from_path(&bam_path, &header, bam::Format::Bam).unwrap();
             let mut sam_reader = bam::Reader::from_path(&sam_path).unwrap();
             let mut record = bam::Record::new();
             while let Some(result) = sam_reader.read(&mut record) {
@@ -1388,8 +1473,7 @@ mod tests {
         {
             let sam_reader = bam::Reader::from_path(&sam_path).unwrap();
             let header = bam::Header::from_template(sam_reader.header());
-            let mut writer =
-                bam::Writer::from_path(&bam_path, &header, bam::Format::Bam).unwrap();
+            let mut writer = bam::Writer::from_path(&bam_path, &header, bam::Format::Bam).unwrap();
             let mut sam_reader = bam::Reader::from_path(&sam_path).unwrap();
             let mut record = bam::Record::new();
             while let Some(result) = sam_reader.read(&mut record) {
@@ -1443,8 +1527,7 @@ mod tests {
         {
             let sam_reader = bam::Reader::from_path(&sam_path).unwrap();
             let header = bam::Header::from_template(sam_reader.header());
-            let mut writer =
-                bam::Writer::from_path(&bam_path, &header, bam::Format::Bam).unwrap();
+            let mut writer = bam::Writer::from_path(&bam_path, &header, bam::Format::Bam).unwrap();
             let mut sam_reader = bam::Reader::from_path(&sam_path).unwrap();
             let mut record = bam::Record::new();
             while let Some(result) = sam_reader.read(&mut record) {
@@ -1457,7 +1540,10 @@ mod tests {
         let reference = reference_fragments_at(bam_path.to_str().unwrap(), "chr1", 120).unwrap();
         assert_eq!(reference.len(), 1);
         assert_eq!(reference.duplicate_pairs, 3);
-        assert_eq!(reference.with_duplicates("f1").collect::<Vec<_>>(), vec!["f1", "d1"]);
+        assert_eq!(
+            reference.with_duplicates("f1").collect::<Vec<_>>(),
+            vec!["f1", "d1"]
+        );
     }
 
     #[test]
@@ -1472,8 +1558,7 @@ mod tests {
         {
             let sam_reader = bam::Reader::from_path(&sam_path).unwrap();
             let header = bam::Header::from_template(sam_reader.header());
-            let mut writer =
-                bam::Writer::from_path(&bam_path, &header, bam::Format::Bam).unwrap();
+            let mut writer = bam::Writer::from_path(&bam_path, &header, bam::Format::Bam).unwrap();
             let mut sam_reader = bam::Reader::from_path(&sam_path).unwrap();
             let mut record = bam::Record::new();
             while let Some(result) = sam_reader.read(&mut record) {
@@ -1501,8 +1586,7 @@ mod tests {
         {
             let sam_reader = bam::Reader::from_path(&sam_path).unwrap();
             let header = bam::Header::from_template(sam_reader.header());
-            let mut writer =
-                bam::Writer::from_path(&bam_path, &header, bam::Format::Bam).unwrap();
+            let mut writer = bam::Writer::from_path(&bam_path, &header, bam::Format::Bam).unwrap();
             let mut sam_reader = bam::Reader::from_path(&sam_path).unwrap();
             let mut record = bam::Record::new();
             while let Some(result) = sam_reader.read(&mut record) {

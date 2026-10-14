@@ -85,9 +85,8 @@ impl Scaffolds {
                 ));
             }
             let parse = |s: &str| {
-                s.parse::<u64>().map_err(|e| {
-                    io::Error::new(io::ErrorKind::InvalidData, e.to_string())
-                })
+                s.parse::<u64>()
+                    .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))
             };
             list.push(Scaffold {
                 name: fields[0].to_string(),
@@ -152,8 +151,16 @@ mod tests {
         assert_eq!(
             runs,
             vec![
-                Scaffold { name: "chr1".into(), start: 3, stop: 11 },
-                Scaffold { name: "chr1".into(), start: 20, stop: 30 },
+                Scaffold {
+                    name: "chr1".into(),
+                    start: 3,
+                    stop: 11
+                },
+                Scaffold {
+                    name: "chr1".into(),
+                    start: 20,
+                    stop: 30
+                },
             ]
         );
     }
@@ -161,14 +168,29 @@ mod tests {
     #[test]
     fn whole_sequence_is_one_run_when_no_n() {
         let runs = find_non_n_runs("chr1", b"ACGTACGT", 1);
-        assert_eq!(runs, vec![Scaffold { name: "chr1".into(), start: 0, stop: 8 }]);
+        assert_eq!(
+            runs,
+            vec![Scaffold {
+                name: "chr1".into(),
+                start: 0,
+                stop: 8
+            }]
+        );
     }
 
     #[test]
     fn pick_finds_scaffold_covering_offset() {
         let scaffolds = Scaffolds::from_list(vec![
-            Scaffold { name: "a".into(), start: 0, stop: 10 },
-            Scaffold { name: "b".into(), start: 0, stop: 5 },
+            Scaffold {
+                name: "a".into(),
+                start: 0,
+                stop: 10,
+            },
+            Scaffold {
+                name: "b".into(),
+                start: 0,
+                stop: 5,
+            },
         ]);
         assert_eq!(scaffolds.total_length, 15);
         assert_eq!(scaffolds.pick(0).unwrap().name, "a");
