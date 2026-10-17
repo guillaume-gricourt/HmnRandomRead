@@ -2,9 +2,10 @@
 
 use std::fmt;
 
-use crate::profile_error::ProfileError;
+use crate::diversity::Diversity;
+use crate::profile_sequencer::ProfileSequencer;
 use crate::rng::RandomGenerator;
-use crate::sequence::choose_base;
+use crate::sequence::{choose_base, Sequence};
 
 /// One mate of a simulated read pair.
 #[derive(Clone, Debug)]
@@ -19,6 +20,11 @@ pub struct FastqRecord {
     pub chromosome: String,
     pub start: u64,
     pub end: u64,
+    /// When set, used verbatim as the whole FASTQ header instead of the
+    /// default `number/mate reference_chromosome_start_end` form. See
+    /// [`crate::fusion::build_qname`] for why the fusion path needs its
+    /// metadata inside the name rather than in the header's comment.
+    pub qname: Option<String>,
 }
 
 impl FastqRecord {
@@ -44,11 +50,12 @@ impl FastqRecord {
             chromosome,
             start,
             end,
+            qname: None,
         }
     }
 
     /// `0` for the forward-strand mate, `1` for the other — matches
-    /// [`crate::profile_error::FORWARD`]/[`crate::profile_error::REVERSE`].
+    /// [`crate::profile_sequencer::FORWARD`]/[`crate::profile_sequencer::REVERSE`].
     pub fn mate(&self) -> u8 {
         if self.forward {
             0
@@ -58,6 +65,9 @@ impl FastqRecord {
     }
 
     fn name(&self) -> String {
+        if let Some(qname) = &self.qname {
+            return qname.clone();
+        }
         format!(
             "{}/{} {}_{}_{}_{}",
             self.number,
@@ -78,7 +88,7 @@ impl FastqRecord {
 
     /// Introduce sequencing errors per-cycle according to `profile`, mutating
     /// both the base and its quality score wherever an error is drawn.
-    pub fn make_errors(&mut self, rng: &mut RandomGenerator, profile: &ProfileError) {
+    pub fn make_errors(&mut self, rng: &mut RandomGenerator, profile: &ProfileSequencer) {
         let strand = self.mate();
         let mut bytes = std::mem::take(&mut self.sequence).into_bytes();
         for (i, base) in bytes.iter_mut().enumerate() {
@@ -91,6 +101,70 @@ impl FastqRecord {
             }
         }
         self.sequence = String::from_utf8(bytes).expect("sequence bytes must remain valid UTF-8");
+    }
+}
+
+/// Build a head/tail FASTQ record pair from `sequence`: apply diversity
+/// mutation (if any), split it into a head/tail read of `length_reads`
+/// bases, draw baseline quality, apply sequencer error (if any), then
+/// randomize which mate lands in the forward/reverse output. Shared by
+/// `simulate`'s `Generator` and `fusion-simulate`'s `FusionGenerator` — the
+/// only difference between the two is how `sequence`/`location_*` are
+/// picked upstream.
+#[allow(clippy::too_many_arguments)]
+pub fn build_read_pair(
+    mut sequence: Sequence,
+    rng: &mut RandomGenerator,
+    diversity: Option<&Diversity>,
+    length_reads: usize,
+    profile_sequencer: Option<&ProfileSequencer>,
+    number: u64,
+    reference: String,
+    chromosome: String,
+    location_start: u64,
+    location_stop: u64,
+) -> (FastqRecord, FastqRecord) {
+    if let Some(diversity) = diversity {
+        sequence.make_mutation(rng, diversity);
+    }
+
+    let head_seq = sequence.sub_read(length_reads, true, false);
+    let tail_seq = sequence.sub_read(length_reads, false, true);
+    let head_len = head_seq.len() as u64;
+    let tail_len = tail_seq.len() as u64;
+
+    let mut head = FastqRecord::new(
+        head_seq,
+        33,
+        number,
+        true,
+        reference.clone(),
+        chromosome.clone(),
+        location_start,
+        location_start + head_len,
+    );
+    let mut tail = FastqRecord::new(
+        tail_seq,
+        33,
+        number,
+        false,
+        reference,
+        chromosome,
+        location_stop.saturating_sub(tail_len),
+        location_stop,
+    );
+
+    head.init_qual(rng);
+    tail.init_qual(rng);
+    if let Some(profile_sequencer) = profile_sequencer {
+        head.make_errors(rng, profile_sequencer);
+        tail.make_errors(rng, profile_sequencer);
+    }
+
+    if rng.unit() >= 0.5 {
+        (head, tail)
+    } else {
+        (tail, head)
     }
 }
 
@@ -140,26 +214,8 @@ mod tests {
 
     #[test]
     fn mate_matches_strand() {
-        let fwd = FastqRecord::new(
-            "A".into(),
-            33,
-            0,
-            true,
-            "r".into(),
-            "c".into(),
-            0,
-            1,
-        );
-        let rev = FastqRecord::new(
-            "A".into(),
-            33,
-            0,
-            false,
-            "r".into(),
-            "c".into(),
-            0,
-            1,
-        );
+        let fwd = FastqRecord::new("A".into(), 33, 0, true, "r".into(), "c".into(), 0, 1);
+        let rev = FastqRecord::new("A".into(), 33, 0, false, "r".into(), "c".into(), 0, 1);
         assert_eq!(fwd.mate(), 0);
         assert_eq!(rev.mate(), 1);
     }

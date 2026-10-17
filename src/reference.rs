@@ -54,19 +54,30 @@ impl Reference {
     }
 
     /// Parse a `-r/--reference` value: `path`, `path,nb_reads`, or
-    /// `path,nb_reads,id_diversity`.
+    /// `path,nb_reads,id_diversity`. `nb_reads` may be left empty (`path,`,
+    /// `path,,id_diversity`) and then defaults to 0, so a reference brought
+    /// in only to resolve a contig — a fusion partner's chromosome, say —
+    /// can still carry an `id_diversity` without claiming a read count.
     pub fn parse_spec(spec: &str) -> Result<(String, u64, Option<String>), Box<dyn Error>> {
         let fields: Vec<&str> = spec.split(',').collect();
         match fields.as_slice() {
             [path] => Ok((path.to_string(), 0, None)),
-            [path, nb_reads] => Ok((path.to_string(), nb_reads.parse()?, None)),
+            [path, nb_reads] => Ok((path.to_string(), Self::parse_nb_reads(nb_reads)?, None)),
             [path, nb_reads, id_diversity] => Ok((
                 path.to_string(),
-                nb_reads.parse()?,
+                Self::parse_nb_reads(nb_reads)?,
                 Some(id_diversity.to_string()),
             )),
             _ => Err(format!("malformed --reference value: '{spec}'").into()),
         }
+    }
+
+    /// A spec's `nb_reads` field: an empty field means "unspecified", 0.
+    fn parse_nb_reads(nb_reads: &str) -> Result<u64, Box<dyn Error>> {
+        if nb_reads.is_empty() {
+            return Ok(0);
+        }
+        Ok(nb_reads.parse()?)
     }
 }
 
@@ -95,6 +106,22 @@ mod tests {
         let (path, nb_reads, id) = Reference::parse_spec("genome.fa,100,human").unwrap();
         assert_eq!(path, "genome.fa");
         assert_eq!(nb_reads, 100);
+        assert_eq!(id.as_deref(), Some("human"));
+    }
+
+    #[test]
+    fn parse_spec_path_and_empty_count() {
+        let (path, nb_reads, id) = Reference::parse_spec("genome.fa,").unwrap();
+        assert_eq!(path, "genome.fa");
+        assert_eq!(nb_reads, 0);
+        assert_eq!(id, None);
+    }
+
+    #[test]
+    fn parse_spec_empty_count_and_diversity() {
+        let (path, nb_reads, id) = Reference::parse_spec("genome.fa,,human").unwrap();
+        assert_eq!(path, "genome.fa");
+        assert_eq!(nb_reads, 0);
         assert_eq!(id.as_deref(), Some("human"));
     }
 
