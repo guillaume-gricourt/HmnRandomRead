@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.12.0](https://github.com/guillaume-gricourt/HmnRandomRead/tree/0.12.0) (2026-09-27)
+
+[Full Changelog](https://github.com/guillaume-gricourt/HmnRandomRead/compare/0.11.0...0.12.0)
+
+**Merged pull requests:**
+
+- chore\(deps\): bump actions/upload-artifact from 4 to 7 [\#20](https://github.com/guillaume-gricourt/HmnRandomRead/pull/20) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(deps\): bump actions/download-artifact from 4 to 8 [\#19](https://github.com/guillaume-gricourt/HmnRandomRead/pull/19) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(deps\): bump actions/checkout from 4 to 7 [\#18](https://github.com/guillaume-gricourt/HmnRandomRead/pull/18) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(deps\): bump actions/checkout from 4 to 7 [\#17](https://github.com/guillaume-gricourt/HmnRandomRead/pull/17) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(deps\): bump actions/upload-artifact from 4 to 7 [\#16](https://github.com/guillaume-gricourt/HmnRandomRead/pull/16) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(deps\): bump softprops/action-gh-release from 2 to 3 [\#15](https://github.com/guillaume-gricourt/HmnRandomRead/pull/15) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore\(deps\): bump actions/download-artifact from 4 to 8 [\#14](https://github.com/guillaume-gricourt/HmnRandomRead/pull/14) ([dependabot[bot]](https://github.com/apps/dependabot))
+
 ## [0.11.0](https://github.com/guillaume-gricourt/HmnRandomRead/tree/0.11.0) (2026-08-23)
 
 [Full Changelog](https://github.com/guillaume-gricourt/HmnRandomRead/compare/0.10.0...0.11.0)
