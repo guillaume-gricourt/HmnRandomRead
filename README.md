@@ -73,7 +73,7 @@ HmnRandomRead statistics-bam \
     --output-statistics-csv <string, optional>
 
 HmnRandomRead fusion-simulate \
-    --input-reference-fasta <string, required><int, required><string, optional> \
+    --input-reference-fasta <string, required><int, required> \
     --parameter-breakpoint-primary-roi <string, required> \
     --parameter-breakpoint-secondary-roi <string, required> \
     --parameter-reciprocal-rate-float <float, optional, 0.5> \
@@ -86,7 +86,6 @@ HmnRandomRead fusion-simulate \
     --parameter-std-insert-int <int, optional, 50> \
     --parameter-minimum-anchor-int <int, optional, 20> \
 
-    --input-profile-diversity-csv <string, optional> \
     --input-profile-sequencer-csv <string, optional> \
     --parameter-profile-sequencer-id-str <string, optional> \
     --parameter-seed-int <int, optional, 0>
@@ -115,7 +114,8 @@ repeated: `path[,nb_reads[,id_diversity]]`).
 Indicate also the number of sequence to generate for each reference.
 `nb_reads` may be left empty (`path,`, `path,,id_diversity`) and then defaults
 to 0 — handy for a reference brought in only to resolve a contig, such as a
-fusion partner's chromosome, which still needs its `id_diversity`.
+fusion partner's chromosome. `fusion-simulate` takes `path[,nb_reads]` only:
+it applies no diversity profile.
 
 ### Output
 
@@ -229,12 +229,13 @@ HmnRandomRead statistics-bam \
 `fusion-simulate` writes a pool of synthetic read pairs supporting a gene
 fusion / structural-variant breakpoint, and nothing else — no sample reads are
 merged in, so one pool can be diluted into any sample at any fraction
-afterwards. It reuses `simulate`'s reference, diversity, sequencer error,
-insert size and seed options:
+afterwards. It reuses `simulate`'s reference, sequencer error, insert size
+and seed options; it applies no diversity profile, so the fusion reads carry
+no SNP/indel besides the sequencing errors:
 
 ```sh
 HmnRandomRead fusion-simulate \
-    --input-reference-fasta genome.fa,50000,human \
+    --input-reference-fasta genome.fa,50000 \
     --parameter-breakpoint-primary-roi chr9:130854064 \
     --parameter-breakpoint-secondary-roi chr22:23632600 \
     --parameter-reciprocal-rate-float 0.0 \
@@ -275,8 +276,7 @@ HmnRandomRead fusion-simulate \
   in its truth row's junction label (`chrom:pos(strand)>chrom:pos(strand)`),
   and the strands in `#strand_primary`/`#strand_secondary`.
 - The number of read pairs to produce is the `nb_reads` field of the
-  `--input-reference-fasta` spec holding the primary breakpoint — the same
-  spec that supplies `id_diversity`. Generate the pool with a wide margin: it
+  `--input-reference-fasta` spec holding the primary breakpoint. Generate the pool with a wide margin: it
   costs little, and `fusion-spike` samples from it.
 - Two chimeric junction sequences are built: the primary partner's 5' part
   followed by the secondary partner's 3' part, and the reciprocal (the
@@ -413,8 +413,7 @@ HmnRandomRead fusion-spike \
   indel only shifting the bases away from the junction. The variants
   carried are listed in the truth TSV (`#haplotype_variants_primary`,
   `#haplotype_variants_secondary`), with the number of pairs they changed
-  (`#haplotype_rewritten_pairs`). A pool built with a diversity profile
-  carrying indels loses the sample's variants past such an indel in a read.
+  (`#haplotype_rewritten_pairs`).
 - The breakpoint to measure that depth at comes from the pool's
   `--input-truth-tsv`, so a pool can never be diluted against the wrong
   locus.

@@ -123,18 +123,13 @@ enum Commands {
     /// The pool is written on its own, not merged into a sample: dilute it
     /// into real FASTQ at a chosen allelic fraction with `fusion-spike`.
     FusionSimulate {
-        /// Reference path with the number of fusion read pairs to produce and
-        /// an optional diversity id: `path[,nb_reads[,id_diversity]]`. May be
-        /// repeated (e.g. one file per partner chromosome); `nb_reads` and
-        /// `id_diversity` are taken from whichever reference holds
-        /// --parameter-breakpoint-primary-roi and must be set there.
+        /// Reference path with the number of fusion read pairs to produce:
+        /// `path[,nb_reads]`. May be repeated (e.g. one file per partner
+        /// chromosome); `nb_reads` is taken from whichever reference holds
+        /// --parameter-breakpoint-primary-roi and must be set there. No
+        /// diversity id: the fusion reads carry no diversity mutation.
         #[arg(long, action = clap::ArgAction::Append)]
         input_reference_fasta: Vec<String>,
-
-        /// Diversity (SNP/indel) profile CSV, applied to the produced
-        /// fusion reads.
-        #[arg(long)]
-        input_profile_diversity_csv: Option<String>,
 
         /// Sequencer error profile CSV, applied to the produced fusion reads.
         #[arg(long)]
@@ -632,7 +627,6 @@ fn cmd_statistics_bam(command: &Commands) -> i32 {
 fn cmd_fusion_simulate(command: &Commands) -> i32 {
     let Commands::FusionSimulate {
         input_reference_fasta,
-        input_profile_diversity_csv,
         input_profile_sequencer_csv,
         parameter_breakpoint_primary_roi,
         parameter_breakpoint_secondary_roi,
@@ -697,6 +691,14 @@ fn cmd_fusion_simulate(command: &Commands) -> i32 {
             return 1;
         }
     };
+    if let Some(reference) = references.iter().find(|r| r.id_diversity.is_some()) {
+        log::error!(
+            "invalid --input-reference-fasta for '{}': fusion-simulate takes \
+             'path[,nb_reads]', with no diversity id",
+            reference.path
+        );
+        return 1;
+    }
     println!("fusion-simulate: loaded {} reference(s)", references.len());
 
     let Some(ref_primary) = references
@@ -721,32 +723,28 @@ fn cmd_fusion_simulate(command: &Commands) -> i32 {
     };
 
     // The pool size comes from the `nb_reads` field of the reference holding
-    // the primary breakpoint, the same spec that already supplies
-    // `id_diversity` — no separate count flag to keep in sync with it.
+    // the primary breakpoint — no separate count flag to keep in sync with it.
     let n_total = ref_primary.nb_reads;
     if n_total == 0 {
         log::error!(
             "no read count set for '{path}': give the number of fusion read pairs to produce in \
-             its --input-reference-fasta spec, as '{path},<nb_reads>[,id_diversity]'",
+             its --input-reference-fasta spec, as '{path},<nb_reads>'",
             path = ref_primary.path
         );
         return 1;
     }
 
-    let (profile_diversity, profile_sequencer) = match load_profiles(
-        input_profile_diversity_csv,
+    let profile_sequencer = match load_profiles(
+        &None,
         input_profile_sequencer_csv,
         parameter_profile_sequencer_id_str,
     ) {
-        Ok(profiles) => profiles,
+        Ok((_, profile_sequencer)) => profile_sequencer,
         Err(e) => {
             log::error!("{e}");
             return 1;
         }
     };
-    if let Some(path) = input_profile_diversity_csv {
-        println!("fusion-simulate: loaded diversity profile from '{path}'");
-    }
     if let Some(path) = input_profile_sequencer_csv {
         println!(
             "fusion-simulate: loaded sequencer profile from '{path}' (id={})",
@@ -774,8 +772,6 @@ fn cmd_fusion_simulate(command: &Commands) -> i32 {
         mean_insert_size: *parameter_mean_insert_int as f64,
         std_insert_size: *parameter_std_insert_int as f64,
         min_anchor: *parameter_minimum_anchor_int,
-        profile_diversity,
-        id_diversity: ref_primary.id_diversity.clone(),
         profile_sequencer,
     };
     let generator = FusionGenerator::new(fusion_config);
@@ -1309,9 +1305,7 @@ fn find_reference<'a>(
 /// mate is the head read (drawn at random when the pool was built) and
 /// where the pool added its own sequencing errors, the variant version
 /// supplies the bases to write. Fragment length is kept, so an indel only
-/// shifts the bases away from the junction. A pool built with a diversity
-/// profile carrying indels loses the variants past such an indel in the
-/// read, where it no longer lines up with the reference.
+/// shifts the bases away from the junction.
 fn carry_sample_haplotype(
     rows: &[fusion::TruthRow],
     forward: &mut [FastqRawRecord],
@@ -2124,7 +2118,7 @@ mod tests {
             APP_NAME,
             "fusion-simulate",
             "--input-reference-fasta",
-            "genome.fa,1000,human",
+            "genome.fa,1000",
             "--parameter-breakpoint-primary-roi",
             "chr9:130854064",
             "--parameter-breakpoint-secondary-roi",
@@ -2148,10 +2142,7 @@ mod tests {
         else {
             panic!("expected Commands::FusionSimulate");
         };
-        assert_eq!(
-            input_reference_fasta,
-            &vec!["genome.fa,1000,human".to_string()]
-        );
+        assert_eq!(input_reference_fasta, &vec!["genome.fa,1000".to_string()]);
         assert_eq!(parameter_breakpoint_primary_roi, "chr9:130854064");
         assert_eq!(*parameter_reciprocal_rate_float, 0.5);
         assert_eq!(output_truth_tsv, "pool.tsv");
@@ -2215,7 +2206,30 @@ mod tests {
             APP_NAME,
             "fusion-simulate",
             "--input-reference-fasta",
-            &format!("{reference},,human"),
+            &format!("{reference},"),
+            "--parameter-breakpoint-primary-roi",
+            "chr1:300",
+            "--parameter-breakpoint-secondary-roi",
+            "chr1:900",
+            "--output-forward-fastq",
+            "out_r1.fastq.gz",
+            "--output-reverse-fastq",
+            "out_r2.fastq.gz",
+            "--output-truth-tsv",
+            "out.tsv",
+        ]);
+        assert_eq!(cmd_fusion_simulate(&cli.command), 1);
+    }
+
+    #[test]
+    fn fusion_simulate_rejects_a_reference_with_a_diversity_id() {
+        let dir = tempfile::tempdir().unwrap();
+        let reference = write_reference(dir.path(), "chr1", 2000);
+        let cli = Cli::parse_from([
+            APP_NAME,
+            "fusion-simulate",
+            "--input-reference-fasta",
+            &format!("{reference},10,human"),
             "--parameter-breakpoint-primary-roi",
             "chr1:300",
             "--parameter-breakpoint-secondary-roi",

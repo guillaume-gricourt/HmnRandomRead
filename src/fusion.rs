@@ -14,7 +14,6 @@ use rust_htslib::bam::{
     Read as BamRead,
 };
 
-use crate::diversity::ProfileDiversity;
 use crate::fastq::{build_read_pair, FastqRecord};
 use crate::haplotype::{apply_variants, Variant};
 use crate::io::FastaIndexedReader;
@@ -220,8 +219,8 @@ pub fn fragment_reads(
 
 /// `read`, a pool read sequenced from the reference allele `clean`, made
 /// to carry the sample's alleles `carried` instead. Wherever the pool read
-/// differs from `clean` — a sequencing error or diversity mutation drawn
-/// when the pool was built — its own base is kept, so only the bases the
+/// differs from `clean` — a sequencing error drawn when the pool was
+/// built — its own base is kept, so only the bases the
 /// sample's variants change are rewritten. Case follows the pool read.
 pub fn carry_variants(read: &str, clean: &str, carried: &str) -> String {
     read.bytes()
@@ -813,8 +812,6 @@ pub struct FusionConfig {
     pub mean_insert_size: f64,
     pub std_insert_size: f64,
     pub min_anchor: usize,
-    pub profile_diversity: Option<ProfileDiversity>,
-    pub id_diversity: Option<String>,
     pub profile_sequencer: Option<ProfileSequencer>,
 }
 
@@ -850,12 +847,6 @@ impl FusionGenerator {
         let mut reverse = Vec::with_capacity(n as usize);
         let mut truth = Vec::with_capacity(n as usize);
         let mut skipped = 0u64;
-        let diversity = self
-            .config
-            .profile_diversity
-            .as_ref()
-            .zip(self.config.id_diversity.as_ref())
-            .and_then(|(profile, id)| profile.get(id));
 
         for i in 0..n {
             let number = start_number + i;
@@ -881,7 +872,7 @@ impl FusionGenerator {
             let (mut r1, mut r2) = build_read_pair(
                 sequence,
                 rng,
-                diversity,
+                None,
                 self.config.length_reads,
                 self.config.profile_sequencer.as_ref(),
                 number,
@@ -1284,8 +1275,6 @@ mod tests {
             mean_insert_size: 150.0,
             std_insert_size: 20.0,
             min_anchor: 20,
-            profile_diversity: None,
-            id_diversity: None,
             profile_sequencer: None,
         };
         let mut rng = RandomGenerator::new(7);
@@ -1322,8 +1311,6 @@ mod tests {
             mean_insert_size: 150.0,
             std_insert_size: 20.0,
             min_anchor: 20,
-            profile_diversity: None,
-            id_diversity: None,
             profile_sequencer: None,
         };
         let mut rng = RandomGenerator::new(7);
